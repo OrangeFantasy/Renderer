@@ -33,7 +33,7 @@
 
 
 #include "MemoryManager.h"
-#include "CoreTypes.h"
+#include "BasicTypes.h"
 #include "Platform.h"
 
 #include "Containers/Container.h"

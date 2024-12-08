@@ -242,8 +242,8 @@ AVulkanTexture2D::AVulkanTexture2D(
 {
 }
 
-AVulkanTexture2D::AVulkanTexture2D(
-    AVulkanDevice* Device, VkFormat Format, uint32_t InSizeX, uint32_t InSizeY, uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags, VkImage Image)
+AVulkanTexture2D::AVulkanTexture2D(AVulkanDevice* Device, VkFormat Format, uint32_t InSizeX, uint32_t InSizeY, uint32_t NumMips, uint32_t NumSamples,
+    VkImageAspectFlags AspectFlags, VkImage Image)
     : AVulkanTextureBase(Device, VK_IMAGE_VIEW_TYPE_2D, Format, InSizeX, InSizeY, 1, 1, NumMips, NumSamples, AspectFlags, Image), SizeX(InSizeX), SizeY(InSizeY)
 {
 }
@@ -728,6 +728,58 @@ bool AVulkanFramebuffer::Matches(const AVulkanRenderTargetsInfo& RTInfo) const
     return true;
 }
 
+AVulkanRenderPass* AVulkanLayoutManager::GetOrCreateRenderPass(AVulkanDevice* Device, const AVulkanRenderTargetLayout& RTLayout)
+{
+    uint64_t RTInfoAddr = (uint64_t)(&RTLayout);
+
+    AVulkanRenderPass** FoundRenderPass = RenderPasses.Find(RTInfoAddr);
+    if (FoundRenderPass)
+    {
+        return *FoundRenderPass;
+    }
+
+    AVulkanRenderPass* RenderPass = new AVulkanRenderPass(Device, RTLayout);
+    RenderPasses.Add(RTInfoAddr, RenderPass);
+    return RenderPass;
+}
+
+AVulkanFramebuffer* AVulkanLayoutManager::GetOrCreateFramebuffer(
+    AVulkanDevice* Device, const AVulkanRenderTargetsInfo& RTInfo, const AVulkanRenderTargetLayout& RTLayout, AVulkanRenderPass* RenderPass)
+{
+    uint64_t RTInfoAddr = (uint64_t)(&RTLayout);
+
+    FFramebufferList** FoundFramebufferList = Framebuffers.Find(RTInfoAddr);
+    FFramebufferList* FramebufferList = nullptr;
+    if (FoundFramebufferList)
+    {
+        FramebufferList = *FoundFramebufferList;
+        for (AVulkanFramebuffer* Framebuffer : FramebufferList->Framebuffer)
+        {
+            if (Framebuffer->Matches(RTInfo))
+            {
+                return Framebuffer;
+            }
+        }
+    }
+    else
+    {
+        FramebufferList = new FFramebufferList;
+        Framebuffers.Add(RTInfoAddr, FramebufferList);
+    }
+
+    AVulkanFramebuffer* Framebuffer = new AVulkanFramebuffer(Device, RenderPass, RTInfo, RTLayout);
+    FramebufferList->Framebuffer.Add(Framebuffer);
+    return Framebuffer;
+}
+
+// void AVulkanLayoutManager::EndRenderPass(CVulkanCmdBuffer* CmdBuffer)
+//  {
+//     check(CurrentRenderPass);
+//     CmdBuffer->EndRenderPass();
+//
+//     CurrentRenderPass = nullptr;
+// }
+
 AVulkanRenderPass::AVulkanRenderPass(AVulkanDevice* InDevice)
     : RenderPass(VK_NULL_HANDLE), Device(InDevice), Layout(AVulkanRenderTargetsInfo()), NumUsedClearValues(0)
 {
@@ -778,7 +830,7 @@ AVulkanRenderPass::AVulkanRenderPass(AVulkanDevice* InDevice)
 }
 
 AVulkanFramebuffer_Old::AVulkanFramebuffer_Old(AVulkanDevice* InDevice, AVulkanRenderPass* InRenderPass, VkImageView InView, VkExtent2D InExtents)
-    : AVulkanFramebuffer_Old(InDevice, InRenderPass, TArray<VkImageView>({InView}), InExtents)
+    : AVulkanFramebuffer_Old(InDevice, InRenderPass, TArray<VkImageView>({ InView }), InExtents)
 {
 }
 

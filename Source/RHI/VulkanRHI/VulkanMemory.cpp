@@ -60,7 +60,7 @@ AVulkanFence* AVulkanFenceManager::AllocateFence(bool bCreateSignaled)
     if (FreeFences.Num() != 0)
     {
         AVulkanFence* Fence = FreeFences[0];
-        FreeFences.RemoveAtSwap(0);
+        FreeFences.RemoveAt(0);
         UsedFences.Add(Fence);
 
         if (bCreateSignaled)
@@ -78,7 +78,7 @@ AVulkanFence* AVulkanFenceManager::AllocateFence(bool bCreateSignaled)
 void AVulkanFenceManager::ReleaseFence(AVulkanFence* Fence)
 {
     ResetFence(Fence);
-    UsedFences.RemoveSingleSwap(Fence);
+    UsedFences.RemoveFirst(Fence);
     FreeFences.Add(Fence);
     Fence = nullptr;
 }
@@ -121,7 +121,7 @@ void AVulkanFenceManager::WaitAndReleaseFence(AVulkanFence* Fence, uint64_t Time
     }
 
     ResetFence(Fence);
-    UsedFences.RemoveSingleSwap(Fence);
+    UsedFences.RemoveFirst(Fence);
     FreeFences.Add(Fence);
     Fence = nullptr;
 }

@@ -2,7 +2,7 @@
 //
 // #include <memory>
 
-#include "Core/Core.h"
+#include "Core/BasicCore.h"
 
 struct TA
 {

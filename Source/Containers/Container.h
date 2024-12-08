@@ -7,47 +7,16 @@
 #include <type_traits>
 #include <algorithm>
 
-#include "Core/MemoryManager.h"
-#include "Core/CoreTypes.h"
+#include "Core/BasicTypes.h"
 
 template <typename _Ty>
 using TInitializerList = std::initializer_list<_Ty>;
 
-template <typename _Kty, typename Ty>
-using TMap = std::unordered_map<_Kty, Ty>;
+template <typename _Ty1, typename _Ty2>
+using TPair = std::pair<_Ty1, _Ty2>;
 
 template <typename _Ty>
 using TSet = std::unordered_set<_Ty>;
-
-#if TARRAY_RANGED_FOR_CHECKS
-template <typename _Ty, typename _STy>
-struct TCheckedPointerIterator
-{
-    explicit TCheckedPointerIterator(_Ty* InPtr, _STy InNum) : Ptr(InPtr), InitialNum(InNum), CurrentNum(InNum) {}
-
-    _Ty& operator*() const { return *Ptr; }
-
-    TCheckedPointerIterator& operator++()
-    {
-        ++Ptr;
-        return *this;
-    }
-
-private:
-    _Ty* Ptr;
-    const _STy CurrentNum;
-    _STy InitialNum;
-
-    friend bool operator!=(const TCheckedPointerIterator& Lhs, const TCheckedPointerIterator& Rhs)
-    {
-        if (Lhs.CurrentNum != Lhs.InitialNum)
-        {
-            std::cerr << "Array has changed during ranged-for iteration! \n";
-        }
-        return Lhs.Ptr != Rhs.Ptr;
-    }
-};
-#endif
 
 template <typename _Ty, typename _Alloc = std::allocator<_Ty>>
 class TArray
@@ -113,6 +82,8 @@ public:
 
     inline bool IsEmpty() const { return Data.empty(); }
 
+    inline void Clear() { Data.clear(); }
+
     bool Contains(const _Ty& Item)
     {
         for (const _Ty* __restrict Data = GetData(), * __restrict End = Data + Num(); Data != End; ++Data)
@@ -130,6 +101,7 @@ public:
         Data.push_back(Item);
         return Num();
     }
+
     SizeType Add(_Ty&& Item)
     {
         Data.push_back(std::move(Item));
@@ -153,68 +125,117 @@ public:
     SizeType AddZeroed(SizeType Count = 1)
     {
         const SizeType OldNum = Num();
-        Resize(Num() + Count);
+        Resize(OldNum + Count);
         AMemory::Memzero(GetData() + OldNum * sizeof(_Ty), Count * sizeof(_Ty));
-        return OldNum;
+        return Num();
     }
 
-    SizeType AddUnique(const _Ty& Item) { return AddUniqueImplement(Item); }
+    inline SizeType AddUnique(const _Ty& Item) { return AddUnique_Impl(Item); }
+    inline SizeType AddUnique(_Ty&& Item) { return AddUnique_Impl(std::move(Item)); }
 
-    SizeType AddUnique(_Ty&& Item) { return AddUniqueImplement(std::move(Item)); }
-
-    void RemoveAt(SizeType Index) { Data.erase(Data.begin() + Index); }
-
-    void RemoveAtSwap(SizeType Index)
+    void RemoveAt(SizeType Index)
     {
         std::swap(*(Data.begin() + Index), *(Data.end() - 1));
         Data.pop_back();
     }
 
-    SizeType RemoveSingle(const _Ty& Item)
+    void RemoveAt_Stable(SizeType Index) { Data.erase(Data.begin() + Index); }
+
+    SizeType RemoveFirst(const _Ty& Item)
     {
         SizeType Index = -1;
         Find(Item, Index);
         RemoveAt(Index);
         return Index;
     }
-
-    SizeType RemoveSingleSwap(const _Ty& Item)
+    SizeType RemoveFirst_Stable(const _Ty& Item)
     {
         SizeType Index = -1;
         Find(Item, Index);
-        RemoveAtSwap(Index);
+        RemoveAt_Stable(Index);
         return Index;
     }
 
     inline void Resize(SizeType NewSize) { Data.resize(NewSize); }
     inline void Resize(SizeType NewSize, const _Ty& Value) { Data.resize(NewSize, Value); }
 
-    inline void Empty(SizeType NewSize)
+    inline bool Find(const _Ty& Item, SizeType& Index) const { return Find_Impl<_Ty>(Item, Index); }
+    inline bool Find(const _Ty& Item) const { return Find_Impl<_Ty>(Item); }
+
+    inline void Sort() { Sort_Impl<_Ty>(); }
+
+    // Range-for.
+    using Iterator = _Ty*;
+    using ConstIterator = const _Ty*;
+
+    Iterator begin() { return GetData(); }
+    Iterator end() { return GetData() + Num(); }
+    ConstIterator begin() const { return GetData(); }
+    ConstIterator end() const { return GetData() + Num(); }
+
+private:
+    template <typename _Vty>
+    SizeType AddUnique_Impl(_Vty&& Arg)
     {
-        Clear();
-        Resize(NewSize);
+        SizeType Index = -1;
+        if (Find(Arg, Index))
+        {
+            return Index;
+        }
+        return Add(std::forward<_Vty>(Arg));
     }
 
-    inline void Clear() { Data.clear(); }
-
-    // For string with type of const AnsiChar*.
-    bool Find(const _Ty& Item, SizeType& Index) const
+    template <typename _Vty>
+    inline void Sort_Impl()
     {
-        if constexpr (std::is_same<_Ty, const AnsiChar*>::value)
+        std::sort(Data.begin(), Data.end());
+    }
+
+    template <>
+    inline void Sort_Impl<const AnsiChar*>()
+    {
+        std::sort(Data.begin(), Data.end(), [](const AnsiChar* Lhs, const AnsiChar* Rhs) { return std::strcmp(Lhs, Rhs) < 0; });
+    }
+
+    template <typename _Vty>
+    bool Find_Impl(const _Ty& Item) const
+    {
+        return std::find(Data.begin(), Data.end(), Item) != Data.end();
+    }
+
+    template <typename _Vty>
+    bool Find_Impl(const _Ty& Item, SizeType& Index) const
+    {
+        if (auto Pos = std::find(Data.begin(), Data.end(), Item); Pos != Data.end())
         {
-            for (Index = 0; Index < Num(); ++Index)
+            Index = static_cast<SizeType>(std::distance(Data.begin(), Pos));
+            return true;
+        }
+
+        Index = -1;
+        return false;
+    }
+
+    template <>
+    bool Find_Impl<const AnsiChar*>(const _Ty& Item) const
+    {
+        for (int32_t Index = 0; Index < Num(); ++Index)
+        {
+            if (std::strcmp(Data[Index], Item) == 0)
             {
-                if (std::strcmp(Data[Index], Item) == 0)
-                {
-                    return true;
-                }
+                return true;
             }
         }
-        else
+        return false;
+    }
+
+    template <>
+    bool Find_Impl<const AnsiChar*>(const _Ty& Item, SizeType& Index) const
+    {
+        for (Index = 0; Index < Num(); ++Index)
         {
-            if (auto Pos = std::find(Data.begin(), Data.end(), Item); Pos != Data.end())
+            if (std::strcmp(Data[Index], Item) == 0)
             {
-                Index = static_cast<SizeType>(std::distance(Data.begin(), Pos));
                 return true;
             }
         }
@@ -223,70 +244,74 @@ public:
         return false;
     }
 
-    bool Find(const _Ty& Item) const
-    {
-        if constexpr (std::is_same<_Ty, const AnsiChar*>::value)
-        {
-            for (int32_t Index = 0; Index < Num(); ++Index)
-            {
-                if (std::strcmp(Data[Index], Item) == 0)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-        else
-        {
-            return std::find(Data.begin(), Data.end(), Item) != Data.end();
-        }
-    }
-
-    inline void Sort()
-    {
-        if constexpr (std::is_same<_Ty, const AnsiChar*>::value)
-        {
-            std::sort(Data.begin(), Data.end(), [](const _Ty& Lhs, const _Ty& Rhs) { return std::strcmp(Lhs, Rhs) < 0; });
-        }
-        else
-        {
-            std::sort(Data.begin(), Data.end());
-        }
-    }
-
-    // Range-for.
-#if TARRAY_RANGED_FOR_CHECKS
-    using IteratorType = TCheckedPointerIterator<_Ty, SizeType>;
-    using ConstIteratorType = TCheckedPointerIterator<const _Ty, SizeType>;
-#else
-    using IteratorType = _Ty*;
-    using ConstIteratorType = const _Ty*;
-#endif
-
-#if TARRAY_RANGED_FOR_CHECKS
-    IteratorType begin() { return IteratorType(GetData(), Num()); }
-    IteratorType end() { return IteratorType(GetData() + Num(), Num()); }
-    ConstIteratorType begin() const { return ConstIteratorType(GetData(), Num()); }
-    ConstIteratorType end() const { return ConstIteratorType(GetData() + Num(), Num()); }
-#else
-    IteratorType begin() { return GetData(); }
-    IteratorType end() { return GetData() + Num(); }
-    ConstIteratorType begin() const { return GetData(); }
-    ConstIteratorType end() const { return GetData() + Num(); }
-#endif
-
-private:
-    template <typename _ArgTy>
-    SizeType AddUniqueImplement(_ArgTy&& Arg)
-    {
-        SizeType Index = -1;
-        if (Find(Arg, Index))
-        {
-            return Index;
-        }
-        return Add(std::forward<_ArgTy>(Arg));
-    }
-
 private:
     std::vector<_Ty, _Alloc> Data;
+};
+
+template <typename _Kty, typename _Vty>
+class TMap
+{
+    template <typename _OtherKty, typename _OtherVty>
+    friend class TMap;
+
+    using SizeType = int32_t;
+    using Iterator = typename std::unordered_map<_Kty, _Vty>::iterator;
+    using ConstIterator = typename std::unordered_map<_Kty, _Vty>::const_iterator;
+
+public:
+    TMap() = default;
+    TMap(const TMap& Other) : Data(Other.Data) {}
+    TMap(TMap&& Other) : Data(std::move(Other.Data)) {}
+
+    TMap& operator=(const TMap& Other)
+    {
+        if (this != &Other)
+        {
+            Data = Other.Data;
+        }
+        return *this;
+    }
+    TMap& operator=(TMap&& Other) noexcept
+    {
+        Data = std::move(Other.Data);
+        return *this;
+    }
+
+    inline _Vty& operator[](_Kty Key) { return Data[Key]; }
+    inline const _Vty& operator[](_Kty Key) const { return Data[Key]; }
+
+    inline TPair<Iterator, bool> Add(_Kty Key, _Vty Val) { return Data.emplace(Key, Val); }
+
+    inline _Vty* Remove(_Kty Key)
+    {
+        _Vty* Val = Find(Key);
+        if (Val)
+        {
+            Data.erase(Key);
+        }
+        return Val;
+    }
+
+    inline _Vty* Find(_Kty Key)
+    {
+        Iterator Iter = Data.find(Key);
+        if (Iter != Data.end())
+        {
+            return &Iter->second;
+        }
+        return nullptr;
+    }
+
+    inline const _Vty* Find(_Kty Key) const
+    {
+        ConstIterator Iter = Data.find(Key);
+        if (Iter != Data.end())
+        {
+            return &Iter->second;
+        }
+        return nullptr;
+    }
+
+private:
+    std::unordered_map<_Kty, _Vty> Data;
 };

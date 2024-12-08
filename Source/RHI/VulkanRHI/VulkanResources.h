@@ -92,8 +92,8 @@ struct AVulkanTexture2D : public AVulkanTextureBase
 {
     AVulkanTexture2D(
         AVulkanDevice* Device, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags);
-    AVulkanTexture2D(
-        AVulkanDevice* Device, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags, VkImage Image);
+    AVulkanTexture2D(AVulkanDevice* Device, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t NumMips, uint32_t NumSamples,
+        VkImageAspectFlags AspectFlags, VkImage Image);
 
     uint32_t SizeX;
     uint32_t SizeY;
@@ -224,4 +224,32 @@ private:
 
     AVulkanRenderPass* RenderPass;
     AVulkanDevice* Device;
+};
+
+class AVulkanLayoutManager
+{
+public:
+    AVulkanLayoutManager() : CurrentRenderPass(nullptr), CurrentFramebuffer(nullptr) {}
+
+    AVulkanRenderPass* GetOrCreateRenderPass(AVulkanDevice* Device, const AVulkanRenderTargetLayout& RTLayout);
+
+    AVulkanFramebuffer* GetOrCreateFramebuffer(
+        AVulkanDevice* Device, const AVulkanRenderTargetsInfo& RTInfo, const AVulkanRenderTargetLayout& RTLayout, AVulkanRenderPass* RenderPass);
+
+    // void BeginRenderPass(AVulkanDevice* Device, AVulkanCmdBuffer* CmdBuffer, const AVulkanRenderTargetLayout& RTLayout,
+    //     AVulkanRenderPass* RenderPass, AVulkanFramebuffer* Framebuffer);
+    // void EndRenderPass(AVulkanCmdBuffer* CmdBuffer);
+
+public:
+    AVulkanRenderPass* CurrentRenderPass;
+    AVulkanFramebuffer* CurrentFramebuffer;
+
+private:
+    TMap<uint64_t, AVulkanRenderPass*> RenderPasses;
+
+    struct FFramebufferList
+    {
+        TArray<AVulkanFramebuffer*> Framebuffer;
+    };
+    TMap<uint64_t, FFramebufferList*> Framebuffers;
 };
