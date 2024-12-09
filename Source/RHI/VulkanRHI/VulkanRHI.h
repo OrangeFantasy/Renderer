@@ -14,6 +14,7 @@ class AVulkanViewport;
 class AVulkanRenderPass;
 class AVulkanPipeline;
 class AVulkanCommandBufferManager;
+class AVulkanLayoutManager;
 
 class AVulkanRHI
 {
@@ -35,18 +36,18 @@ public:
 
     void WaitIdle();
 
-    //FVulkanTexture2DRef CreateTexture2D(VkFormat Format, uint32_t NumMips, uint32_t NumSamples, VkImageTiling Tiling, VkImageUsageFlags UsageFlags);
-    //FVulkanTexture2DRef CreateTexture2D(
-    //    uint32_t Width, uint32_t Height, VkFormat Format, uint32_t NumMips, uint32_t NumSamples, VkImageTiling Tiling, VkImageUsageFlags UsageFlags);
-    //FVulkanTextureViewRef CreateTextureView(VkImage Image, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, VkFormat Format);
-    //FVulkanTextureViewRef CreateTextureView(VkImage Image, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, VkFormat Format, uint32_t FirstMip,
-    //    uint32_t NumMips, uint32_t ArraySliceIndex, uint32_t NumArraySlices);
+    // FVulkanTexture2DRef CreateTexture2D(VkFormat Format, uint32_t NumMips, uint32_t NumSamples, VkImageTiling Tiling, VkImageUsageFlags UsageFlags);
+    // FVulkanTexture2DRef CreateTexture2D(
+    //     uint32_t Width, uint32_t Height, VkFormat Format, uint32_t NumMips, uint32_t NumSamples, VkImageTiling Tiling, VkImageUsageFlags UsageFlags);
+    // FVulkanTextureViewRef CreateTextureView(VkImage Image, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, VkFormat Format);
+    // FVulkanTextureViewRef CreateTextureView(VkImage Image, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, VkFormat Format, uint32_t FirstMip,
+    //     uint32_t NumMips, uint32_t ArraySliceIndex, uint32_t NumArraySlices);
 
     AVulkanFramebuffer_Old* GetOrCreateSwapChainFrameBuffer(AVulkanRenderPass* RenderPass, int32_t Index);
 
     VkInstance GetInstance() const { return Instance; }
     AVulkanDevice* GetDevice() const { return Device; }
-    //int32_t NumSwapChainBuffers() const { return Viewport->NumBuffers(); }
+    // int32_t NumSwapChainBuffers() const { return Viewport->NumBuffers(); }
     AVulkanCommandBufferManager* GetCommandBufferManager() { return CommandBufferManager; }
 
 private:
@@ -65,10 +66,11 @@ private:
     // FVulkanContext* Context;
     AVulkanViewport* Viewport;
 
-    //AVulkanPipeline* Pipeline;
-    //CVulkanRenderPass* RenderPass;
+    AVulkanPipeline* Pipeline;
+    // CVulkanRenderPass* RenderPass;
 
     AVulkanCommandBufferManager* CommandBufferManager;
+    AVulkanLayoutManager* LayoutManager;
 
 #ifdef VK_VALIDATION_ENABLE
 private:
@@ -79,12 +81,12 @@ private:
     bool SetupDebugMessenger();
 #endif // VULKAN_VALIDATION_ENABLE
 
-    TArray<AVulkanFramebuffer_Old*> Framebuffers;
+    // TArray<AVulkanFramebuffer_Old*> Framebuffers;
 
     TArray<struct AVulkanTexture2D*> ColorTextures;
-    TArray<AVulkanRenderPass*> RenderPasses;
-    TArray<AVulkanPipeline*> Pipelines;
-    // bool CreateSurface(TFunction<VkSurfaceKHR(VkInstance)> SurfaceCallback);
+    // TArray<AVulkanRenderPass*> RenderPasses;
+    // TArray<AVulkanPipeline*> Pipelines;
+    //  bool CreateSurface(TFunction<VkSurfaceKHR(VkInstance)> SurfaceCallback);
 
     // bool PickupPhysicalDevice();
     // bool CreateLogicalDevice();

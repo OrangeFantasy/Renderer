@@ -50,17 +50,25 @@ AVulkanRHI::~AVulkanRHI()
         ColorTexture = nullptr;
     }
 
-    //for (CVulkanRenderPass* Pass : RenderPasses)
-    //{
-    //    delete Pass;
-    //    Pass = nullptr;
-    //}
+    // for (CVulkanRenderPass* Pass : RenderPasses)
+    // {
+    //     delete Pass;
+    //     Pass = nullptr;
+    // }
+    //
+    // for (AVulkanFramebuffer_Old* Framebuffer : Framebuffers)
+    //  {
+    //     delete Framebuffer;
+    //     Framebuffer = nullptr;
+    // }
+    delete Pipeline;
+    Pipeline = nullptr;
 
-    for (AVulkanFramebuffer_Old* Framebuffer : Framebuffers)
-    {
-        delete Framebuffer;
-        Framebuffer = nullptr;
-    }
+    delete LayoutManager;
+    LayoutManager = nullptr;
+
+    delete CommandBufferManager;
+    CommandBufferManager = nullptr;
 
     delete Device;
     Device = nullptr;
@@ -85,6 +93,10 @@ void AVulkanRHI::Initizlize()
     AVulkanPlatform::LoadVulkanInstanceFunctions(Instance);
 
     SelectAndInitizlizeDevice();
+
+    CommandBufferManager = new AVulkanCommandBufferManager(Device);
+    LayoutManager = new AVulkanLayoutManager();
+    Pipeline = nullptr;
 }
 
 void AVulkanRHI::CreateInstance()
@@ -254,7 +266,7 @@ bool AVulkanRHI::SetupDebugMessenger()
 void AVulkanRHI::InitizlizeContext(const AViewportInfo& ViewportInfo)
 {
     Viewport = new AVulkanViewport(this, Device, ViewportInfo.WindowHandle, ViewportInfo.Width, ViewportInfo.Height, ViewportInfo.bIsFullscreen);
-    Framebuffers.Resize(Viewport->NUM_BUFFERS, nullptr);
+    // Framebuffers.Resize(Viewport->NUM_BUFFERS, nullptr);
 
     for (int32_t Index = 0; Index < Viewport->NUM_BUFFERS; ++Index)
     {
@@ -262,47 +274,42 @@ void AVulkanRHI::InitizlizeContext(const AViewportInfo& ViewportInfo)
             Device, Viewport->GetSwapchainImageFormat(), Viewport->SizeX, Viewport->SizeY, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT, Viewport->BackBufferImages[Index]);
         ColorTextures.Add(ColorTexture);
 
-        AVulkanRenderTargetsInfo RTInfo;
-        RTInfo.NumColorRenderTargets = 1;
+        // AVulkanRenderTargetsInfo RTInfo;
+        // RTInfo.NumColorRenderTargets = 1;
 
-        AVulkanRenderTargetView& ColorRTView = RTInfo.ColorRenderTarget[0];
-        ColorRTView.Texture = ColorTexture;
-        ColorRTView.LoadAction = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        ColorRTView.StoreAction = VK_ATTACHMENT_STORE_OP_STORE;
+        // AVulkanRenderTargetView& ColorRTView = RTInfo.ColorRenderTarget[0];
+        // ColorRTView.Texture = ColorTexture;
+        // ColorRTView.LoadAction = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        // ColorRTView.StoreAction = VK_ATTACHMENT_STORE_OP_STORE;
 
-        AVulkanRenderTargetLayout RTLayout(RTInfo);
+        // AVulkanRenderTargetLayout RTLayout(RTInfo);
 
-        AVulkanRenderPass* Pass = new AVulkanRenderPass(Device, RTLayout);
-        RenderPasses.Add(Pass);
+        // AVulkanRenderPass* Pass = new AVulkanRenderPass(Device, RTLayout);
+        // RenderPasses.Add(Pass);
 
-        AVulkanPipeline* Pipeline = new AVulkanPipeline(Device, Pass);
-        Pipelines.Add(Pipeline);
+        // AVulkanPipeline* Pipeline = new AVulkanPipeline(Device, Pass);
+        // Pipelines.Add(Pipeline);
     }
 
     // RenderPass = new CVulkanRenderPass(Device);
     // Pipeline = new AVulkanPipeline(Device, RenderPass);
-
-    CommandBufferManager = new AVulkanCommandBufferManager(Device);
 }
 
 void AVulkanRHI::ClearContext()
 {
-    for (auto RenderPass : RenderPasses)
-    {
-        delete RenderPass;
-        RenderPass = nullptr;
-    }
-    for (auto Pipeline : Pipelines)
-    {
-        delete Pipeline;
-        Pipeline = nullptr;
-    }
+    // for (auto RenderPass : RenderPasses)
+    //{
+    //     delete RenderPass;
+    //     RenderPass = nullptr;
+    // }
+    // for (auto Pipeline : Pipelines)
+    //{
+    //     delete Pipeline;
+    //     Pipeline = nullptr;
+    // }
 
     delete Viewport;
     Viewport = nullptr;
-
-    delete CommandBufferManager;
-    CommandBufferManager = nullptr;
 }
 
 void AVulkanRHI::BeginDrawing()
@@ -325,10 +332,27 @@ void AVulkanRHI::BeginRenderPass()
     AVulkanCmdBuffer* CmdBuffer = CommandBufferManager->GetActiveCmdBuffer();
 
     int32_t ImageIndex = Viewport->AcquireImageIndex();
-    AVulkanFramebuffer_Old* Framebuffer = GetOrCreateSwapChainFrameBuffer(RenderPasses[ImageIndex], ImageIndex);
+
+    AVulkanRenderTargetsInfo RTInfo;
+    RTInfo.NumColorRenderTargets = 1;
+
+    AVulkanRenderTargetView& ColorRTView = RTInfo.ColorRenderTarget[0];
+    ColorRTView.Texture = ColorTextures[ImageIndex];
+    ColorRTView.LoadAction = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    ColorRTView.StoreAction = VK_ATTACHMENT_STORE_OP_STORE;
+
+    AVulkanRenderTargetLayout RTLayout(RTInfo);
+
+    AVulkanRenderPass* RenderPass = LayoutManager->GetOrCreateRenderPass(Device, RTLayout);
+    AVulkanFramebuffer* Framebuffer = LayoutManager->GetOrCreateFramebuffer(Device, RTInfo, RTLayout, RenderPass);
+
+    LayoutManager->CurrentRenderPass = RenderPass;
+    LayoutManager->CurrentFramebuffer = Framebuffer;
+    // AVulkanFramebuffer_Old* Framebuffer = GetOrCreateSwapChainFrameBuffer(RenderPasses[ImageIndex], ImageIndex);
 
     const VkClearValue ClearValues = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-    CmdBuffer->BeginRenderPass(RenderPasses[ImageIndex], Framebuffer, 1, &ClearValues);
+    // CmdBuffer->BeginRenderPass(RenderPasses[ImageIndex], Framebuffer, 1, &ClearValues);
+    CmdBuffer->BeginRenderPass(RenderPass, Framebuffer, 1, &ClearValues);
 
     Viewport->SetViewport(CmdBuffer, 0, 0);
 }
@@ -344,7 +368,12 @@ void AVulkanRHI::DrawPrimitive(uint32_t FirstVertexIndex, uint32_t NumPrimitives
     AVulkanCmdBuffer* CmdBuffer = CommandBufferManager->GetActiveCmdBuffer();
 
     // TODO: vkCmdBindPipeline
-    VulkanApi::vkCmdBindPipeline(CmdBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, Pipelines[Viewport->AcquiredImageIndex]->GetHandle());
+    if (!Pipeline)
+    {
+        Pipeline = new AVulkanPipeline(Device, LayoutManager->CurrentRenderPass);
+    }
+    VulkanApi::vkCmdBindPipeline(CmdBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline->GetHandle());
+    // VulkanApi::vkCmdBindPipeline(CmdBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, Pipelines[Viewport->AcquiredImageIndex]->GetHandle());
 
     uint32_t NumVertices = NumPrimitives * 3;
     VulkanApi::vkCmdDraw(CmdBuffer->GetHandle(), NumVertices, 1, FirstVertexIndex, 0);
@@ -355,22 +384,22 @@ void AVulkanRHI::WaitIdle()
     VK_CHECK_RESULT(VulkanApi::vkDeviceWaitIdle(Device->GetHandle()));
 }
 
-AVulkanFramebuffer_Old* AVulkanRHI::GetOrCreateSwapChainFrameBuffer(AVulkanRenderPass* RenderPass, int32_t Index)
-{
-    AVulkanFramebuffer_Old* Framebuffer = Framebuffers[Index];
-    if (Framebuffer == nullptr)
-    {
-        VkExtent2D Extents;
-        AMemory::Memzero(Extents);
-        Extents.width = Viewport->SizeX;
-        Extents.height = Viewport->SizeY;
-
-        Framebuffer = new AVulkanFramebuffer_Old(Device, RenderPass, Viewport->TextureViews[Index]->View, Extents);
-        Framebuffers[Index] = Framebuffer;
-    }
-
-    return Framebuffer;
-}
+// AVulkanFramebuffer_Old* AVulkanRHI::GetOrCreateSwapChainFrameBuffer(AVulkanRenderPass* RenderPass, int32_t Index)
+//  {
+//     AVulkanFramebuffer_Old* Framebuffer = Framebuffers[Index];
+//     if (Framebuffer == nullptr)
+//     {
+//         VkExtent2D Extents;
+//         AMemory::Memzero(Extents);
+//         Extents.width = Viewport->SizeX;
+//         Extents.height = Viewport->SizeY;
+//
+//         Framebuffer = new AVulkanFramebuffer_Old(Device, RenderPass, Viewport->TextureViews[Index]->View, Extents);
+//         Framebuffers[Index] = Framebuffer;
+//     }
+//
+//     return Framebuffer;
+// }
 
 // FVulkanTexture2DRef FVulkanRHI::CreateTexture2D(VkFormat Format, uint32_t NumMips, uint32_t NumSamples, VkImageTiling Tiling, VkImageUsageFlags UsageFlags)
 //{

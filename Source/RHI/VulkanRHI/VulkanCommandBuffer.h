@@ -7,7 +7,8 @@ class AVulkanQueue;
 class AVulkanFence;
 class AVulkanSemaphore;
 class AVulkanRenderPass;
-class AVulkanFramebuffer_Old;
+class AVulkanFramebuffer;
+// class AVulkanFramebuffer_Old;
 class AVulkanCommandBufferPool;
 class AVulkanCommandBufferManager;
 
@@ -23,7 +24,7 @@ public:
     void Begin();
     void End();
 
-    void BeginRenderPass(AVulkanRenderPass* RenderPass, AVulkanFramebuffer_Old* Framebuffer, uint32_t NumClearValue, const VkClearValue* ClearValues);
+    void BeginRenderPass(AVulkanRenderPass* RenderPass, AVulkanFramebuffer* Framebuffer, uint32_t NumClearValue, const VkClearValue* ClearValues);
     void EndRenderPass();
 
     void AddWaitSemaphore(VkPipelineStageFlags WaitFlags, AVulkanSemaphore* WaitSemaphore);

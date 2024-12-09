@@ -201,7 +201,7 @@ AVulkanTextureView::~AVulkanTextureView()
     }
 }
 
-AVulkanTextureBase::AVulkanTextureBase(AVulkanDevice* InDevice, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ,
+AVulkanTexture::AVulkanTexture(AVulkanDevice* InDevice, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ,
     uint32_t ArraySize, uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags)
     : Super(InDevice), Surface(nullptr), TextureView(nullptr)
 {
@@ -214,7 +214,7 @@ AVulkanTextureBase::AVulkanTextureBase(AVulkanDevice* InDevice, VkImageViewType 
         bIsArray ? std::max(1u, ArraySize) : std::max(1u, SizeZ));
 }
 
-AVulkanTextureBase::AVulkanTextureBase(AVulkanDevice* InDevice, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ,
+AVulkanTexture::AVulkanTexture(AVulkanDevice* InDevice, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ,
     uint32_t ArraySize, uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags, VkImage Image)
     : Super(InDevice), Surface(nullptr), TextureView(nullptr)
 {
@@ -227,7 +227,7 @@ AVulkanTextureBase::AVulkanTextureBase(AVulkanDevice* InDevice, VkImageViewType 
         bIsArray ? std::max(1u, ArraySize) : std::max(1u, SizeZ));
 }
 
-AVulkanTextureBase::~AVulkanTextureBase()
+AVulkanTexture::~AVulkanTexture()
 {
     delete TextureView;
     TextureView = nullptr;
@@ -238,13 +238,13 @@ AVulkanTextureBase::~AVulkanTextureBase()
 
 AVulkanTexture2D::AVulkanTexture2D(
     AVulkanDevice* Device, VkFormat Format, uint32_t InSizeX, uint32_t InSizeY, uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags)
-    : AVulkanTextureBase(Device, VK_IMAGE_VIEW_TYPE_2D, Format, InSizeX, InSizeY, 1, 1, NumMips, NumSamples, AspectFlags), SizeX(InSizeX), SizeY(InSizeY)
+    : AVulkanTexture(Device, VK_IMAGE_VIEW_TYPE_2D, Format, InSizeX, InSizeY, 1, 1, NumMips, NumSamples, AspectFlags), SizeX(InSizeX), SizeY(InSizeY)
 {
 }
 
 AVulkanTexture2D::AVulkanTexture2D(AVulkanDevice* Device, VkFormat Format, uint32_t InSizeX, uint32_t InSizeY, uint32_t NumMips, uint32_t NumSamples,
     VkImageAspectFlags AspectFlags, VkImage Image)
-    : AVulkanTextureBase(Device, VK_IMAGE_VIEW_TYPE_2D, Format, InSizeX, InSizeY, 1, 1, NumMips, NumSamples, AspectFlags, Image), SizeX(InSizeX), SizeY(InSizeY)
+    : AVulkanTexture(Device, VK_IMAGE_VIEW_TYPE_2D, Format, InSizeX, InSizeY, 1, 1, NumMips, NumSamples, AspectFlags, Image), SizeX(InSizeX), SizeY(InSizeY)
 {
 }
 
@@ -259,13 +259,16 @@ AVulkanRenderTargetLayout::AVulkanRenderTargetLayout(const AVulkanRenderTargetsI
     AMemory::Memzero(Desc);
     AMemory::Memzero(Extent);
 
+    AHashInfo HashInfo;
+    AMemory::Memzero(HashInfo);
+
     bool bSetExtent = false;
     bool bFoundClearOp = false;
 
     for (int32_t Index = 0; Index < RTInfo.NumColorRenderTargets; ++Index)
     {
         const AVulkanRenderTargetView& RTView = RTInfo.ColorRenderTarget[Index];
-        if (AVulkanTextureBase* Texture = RTView.Texture)
+        if (AVulkanTexture* Texture = RTView.Texture)
         {
             AVulkanSurface* Surface = Texture->Surface;
 
@@ -299,6 +302,9 @@ AVulkanRenderTargetLayout::AVulkanRenderTargetLayout(const AVulkanRenderTargetsI
             ColorReferences[NumColorAttachments].attachment = NumAttachmentDescriptions;
             ColorReferences[NumColorAttachments].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+            HashInfo.LoadOps[NumColorAttachments] = CurrDesc.loadOp;
+            HashInfo.StoreOps[NumColorAttachments] = CurrDesc.storeOp;
+
             // TODO: Resolve attachment.
             ++NumAttachmentDescriptions;
             ++NumColorAttachments;
@@ -307,8 +313,8 @@ AVulkanRenderTargetLayout::AVulkanRenderTargetLayout(const AVulkanRenderTargetsI
 
     if (RTInfo.DepthStencilRenderTarget.Texture)
     {
-        const AVulkanRenderTargetView& RTView = RTInfo.DepthStencilRenderTarget;
-        AVulkanTextureBase* Texture = RTView.Texture;
+        const ADepthRenderTargetView& RTView = RTInfo.DepthStencilRenderTarget;
+        AVulkanTexture* Texture = RTView.Texture;
         check(Texture);
 
         AVulkanSurface* Surface = Texture->Surface;
@@ -331,10 +337,10 @@ AVulkanRenderTargetLayout::AVulkanRenderTargetLayout(const AVulkanRenderTargetsI
         VkAttachmentDescription& CurrDesc = Desc[NumAttachmentDescriptions];
         CurrDesc.format = VK_FORMAT_D32_SFLOAT_S8_UINT;
         CurrDesc.samples = VK_SAMPLE_COUNT_1_BIT;
-        CurrDesc.loadOp = RTView.LoadAction;
-        CurrDesc.storeOp = RTView.StoreAction;
-        CurrDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        CurrDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        CurrDesc.loadOp = RTView.DepthLoadAction;
+        CurrDesc.storeOp = RTView.DepthStoreAction;
+        CurrDesc.stencilLoadOp = RTView.StencilLoadAction;
+        CurrDesc.stencilStoreOp = RTView.StencilStoreAction;
         CurrDesc.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         CurrDesc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
@@ -343,11 +349,20 @@ AVulkanRenderTargetLayout::AVulkanRenderTargetLayout(const AVulkanRenderTargetsI
         DepthStencilReference.attachment = NumAttachmentDescriptions;
         DepthStencilReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+        HashInfo.LoadOps[MaxSimultaneousRenderTargets] = CurrDesc.loadOp;
+        HashInfo.StoreOps[MaxSimultaneousRenderTargets] = CurrDesc.storeOp;
+        HashInfo.LoadOps[MaxSimultaneousRenderTargets + 1] = CurrDesc.stencilLoadOp;
+        HashInfo.StoreOps[MaxSimultaneousRenderTargets + 1] = CurrDesc.stencilStoreOp;
+
         ++NumAttachmentDescriptions;
         bHasDepthStencil = true;
     }
 
     NumUsedClearValues = bFoundClearOp ? NumAttachmentDescriptions : 0;
+
+    char HashInfoByte[sizeof(AHashInfo)];
+    std::memcpy(HashInfoByte, &HashInfo, sizeof(AHashInfo));
+    Hash = static_cast<uint64_t>(std::hash<char*>()(HashInfoByte));
 }
 
 // CVulkanRenderTargetLayout::CVulkanRenderTargetLayout(const CVulkanRenderPassInfo& RPInfo)
@@ -606,14 +621,13 @@ AVulkanFramebuffer::AVulkanFramebuffer(
     const VkExtent2D& RTExtent = RTLayout.GetExtent2D();
     check(RTExtent.width != 0 && RTExtent.height != 0);
     Extents = RTExtent;
-    uint32_t NumLayers = 1; // For 2D.
 
-    AttachmentTextureViews.Resize(RTLayout.NumAttachmentDescriptions);
+    uint32_t NumLayers = 1; // For 2D.
     uint32_t MipIndex = 0;
 
     for (int32_t Index = 0; Index < RTInfo.NumColorRenderTargets; ++Index)
     {
-        AVulkanTextureBase* Texture = RTInfo.ColorRenderTarget[Index].Texture;
+        AVulkanTexture* Texture = RTInfo.ColorRenderTarget[Index].Texture;
         if (Texture)
         {
             AVulkanSurface* Surface = Texture->Surface;
@@ -639,7 +653,7 @@ AVulkanFramebuffer::AVulkanFramebuffer(
 
     if (RTLayout.bHasDepthStencil)
     {
-        AVulkanTextureBase* Texture = RTInfo.DepthStencilRenderTarget.Texture;
+        AVulkanTexture* Texture = RTInfo.DepthStencilRenderTarget.Texture;
         check(Texture);
 
         AVulkanSurface* Surface = Texture->Surface;
@@ -660,7 +674,6 @@ AVulkanFramebuffer::AVulkanFramebuffer(
     }
 
     TArray<VkImageView> AttachmentViews;
-    AttachmentViews.Resize(AttachmentTextureViews.Num());
     for (AVulkanTextureView* TextureView : AttachmentTextureViews)
     {
         AttachmentViews.Add(TextureView->View);
@@ -697,7 +710,7 @@ bool AVulkanFramebuffer::Matches(const AVulkanRenderTargetsInfo& RTInfo) const
     }
 
     {
-        const AVulkanRenderTargetView& B = RTInfo.DepthStencilRenderTarget;
+        const ADepthRenderTargetView& B = RTInfo.DepthStencilRenderTarget;
         if (B.Texture)
         {
             VkImage AImage = DepthStencilRenderTargetImage;
@@ -728,27 +741,50 @@ bool AVulkanFramebuffer::Matches(const AVulkanRenderTargetsInfo& RTInfo) const
     return true;
 }
 
+AVulkanLayoutManager::~AVulkanLayoutManager()
+{
+    for (auto& [Hash, RenderPass] : RenderPasses)
+    {
+        delete RenderPass;
+        RenderPass = nullptr;
+    }
+
+    for (auto& [Hash, List] : Framebuffers)
+    {
+        if (List)
+        {
+            for (AVulkanFramebuffer* Framebuffer : List->Framebuffer)
+            {
+                delete Framebuffer;
+                Framebuffer = nullptr;
+            }
+            delete List;
+            List = nullptr;
+        }
+    }
+}
+
 AVulkanRenderPass* AVulkanLayoutManager::GetOrCreateRenderPass(AVulkanDevice* Device, const AVulkanRenderTargetLayout& RTLayout)
 {
-    uint64_t RTInfoAddr = (uint64_t)(&RTLayout);
+    uint64_t RTInfoHash = RTLayout.GetHash();
 
-    AVulkanRenderPass** FoundRenderPass = RenderPasses.Find(RTInfoAddr);
+    AVulkanRenderPass** FoundRenderPass = RenderPasses.Find(RTInfoHash);
     if (FoundRenderPass)
     {
         return *FoundRenderPass;
     }
 
     AVulkanRenderPass* RenderPass = new AVulkanRenderPass(Device, RTLayout);
-    RenderPasses.Add(RTInfoAddr, RenderPass);
+    RenderPasses.Add(RTInfoHash, RenderPass);
     return RenderPass;
 }
 
 AVulkanFramebuffer* AVulkanLayoutManager::GetOrCreateFramebuffer(
     AVulkanDevice* Device, const AVulkanRenderTargetsInfo& RTInfo, const AVulkanRenderTargetLayout& RTLayout, AVulkanRenderPass* RenderPass)
 {
-    uint64_t RTInfoAddr = (uint64_t)(&RTLayout);
+    uint64_t RTInfoHash = RTLayout.GetHash();
 
-    FFramebufferList** FoundFramebufferList = Framebuffers.Find(RTInfoAddr);
+    FFramebufferList** FoundFramebufferList = Framebuffers.Find(RTInfoHash);
     FFramebufferList* FramebufferList = nullptr;
     if (FoundFramebufferList)
     {
@@ -764,7 +800,7 @@ AVulkanFramebuffer* AVulkanLayoutManager::GetOrCreateFramebuffer(
     else
     {
         FramebufferList = new FFramebufferList;
-        Framebuffers.Add(RTInfoAddr, FramebufferList);
+        Framebuffers.Add(RTInfoHash, FramebufferList);
     }
 
     AVulkanFramebuffer* Framebuffer = new AVulkanFramebuffer(Device, RenderPass, RTInfo, RTLayout);
@@ -830,7 +866,7 @@ AVulkanRenderPass::AVulkanRenderPass(AVulkanDevice* InDevice)
 }
 
 AVulkanFramebuffer_Old::AVulkanFramebuffer_Old(AVulkanDevice* InDevice, AVulkanRenderPass* InRenderPass, VkImageView InView, VkExtent2D InExtents)
-    : AVulkanFramebuffer_Old(InDevice, InRenderPass, TArray<VkImageView>({ InView }), InExtents)
+    : AVulkanFramebuffer_Old(InDevice, InRenderPass, TArray<VkImageView>({InView}), InExtents)
 {
 }
 

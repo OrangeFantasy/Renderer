@@ -90,7 +90,7 @@ void AVulkanCmdBuffer::End()
     State = EState::HasEnded;
 }
 
-void AVulkanCmdBuffer::BeginRenderPass(AVulkanRenderPass* RenderPass, AVulkanFramebuffer_Old* Framebuffer, uint32_t NumClearValue, const VkClearValue* ClearValues)
+void AVulkanCmdBuffer::BeginRenderPass(AVulkanRenderPass* RenderPass, AVulkanFramebuffer* Framebuffer, uint32_t NumClearValue, const VkClearValue* ClearValues)
 {
     check(IsOutsideRenderPass(), "Can't BeginRP as already inside one! CmdBuffer 0x%p State=%d");
 

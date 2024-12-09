@@ -25,6 +25,8 @@ class TArray
     friend class TArray;
 
     using SizeType = int32_t;
+    using Iterator = _Ty*;
+    using ConstIterator = const _Ty*;
 
 public:
     TArray() : Data(std::vector<_Ty, _Alloc>(0)) {}
@@ -165,9 +167,6 @@ public:
     inline void Sort() { Sort_Impl<_Ty>(); }
 
     // Range-for.
-    using Iterator = _Ty*;
-    using ConstIterator = const _Ty*;
-
     Iterator begin() { return GetData(); }
     Iterator end() { return GetData() + Num(); }
     ConstIterator begin() const { return GetData(); }
@@ -280,6 +279,8 @@ public:
     inline _Vty& operator[](_Kty Key) { return Data[Key]; }
     inline const _Vty& operator[](_Kty Key) const { return Data[Key]; }
 
+    inline void Clear() { Data.clear(); }
+
     inline TPair<Iterator, bool> Add(_Kty Key, _Vty Val) { return Data.emplace(Key, Val); }
 
     inline _Vty* Remove(_Kty Key)
@@ -311,6 +312,12 @@ public:
         }
         return nullptr;
     }
+
+    // Range-for.
+    Iterator begin() { return Data.begin(); }
+    Iterator end() { return Data.end(); }
+    ConstIterator begin() const { return Data.begin(); }
+    ConstIterator end() const { return Data.end(); }
 
 private:
     std::unordered_map<_Kty, _Vty> Data;

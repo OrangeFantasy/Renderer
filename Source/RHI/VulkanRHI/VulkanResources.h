@@ -4,7 +4,7 @@
 
 class AVulkanDevice;
 class AVulkanCmdBuffer;
-struct AVulkanTextureBase;
+struct AVulkanTexture;
 
 struct AVulkanDeviceChild
 {
@@ -71,16 +71,16 @@ struct AVulkanSurface : public AVulkanDeviceChild
     VkImageViewType ViewType;
     VkImageAspectFlags AspectMask;
 
-    AVulkanTextureBase* OwningTexture;
+    AVulkanTexture* OwningTexture;
 };
 
-struct AVulkanTextureBase : public AVulkanDeviceChild
+struct AVulkanTexture : public AVulkanDeviceChild
 {
-    AVulkanTextureBase(AVulkanDevice* Device, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ, uint32_t ArraySize,
+    AVulkanTexture(AVulkanDevice* Device, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ, uint32_t ArraySize,
         uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags);
-    AVulkanTextureBase(AVulkanDevice* Device, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ, uint32_t ArraySize,
+    AVulkanTexture(AVulkanDevice* Device, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ, uint32_t ArraySize,
         uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags, VkImage Image);
-    virtual ~AVulkanTextureBase() override;
+    virtual ~AVulkanTexture() override;
 
     inline VkFormat GetFormat() const { return Surface ? Surface->PixelFormat : VkFormat::VK_FORMAT_UNDEFINED; }
 
@@ -88,7 +88,7 @@ struct AVulkanTextureBase : public AVulkanDeviceChild
     AVulkanTextureView* TextureView;
 };
 
-struct AVulkanTexture2D : public AVulkanTextureBase
+struct AVulkanTexture2D : public AVulkanTexture
 {
     AVulkanTexture2D(
         AVulkanDevice* Device, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags);
@@ -101,7 +101,7 @@ struct AVulkanTexture2D : public AVulkanTextureBase
 
 struct AVulkanRenderTargetView
 {
-    AVulkanTextureBase* Texture;
+    AVulkanTexture* Texture;
     uint32_t MipIndex;
     uint32_t ArraySliceIndex;
 
@@ -110,6 +110,39 @@ struct AVulkanRenderTargetView
 
     AVulkanRenderTargetView()
         : Texture(nullptr), MipIndex(0), ArraySliceIndex(-1), LoadAction(VK_ATTACHMENT_LOAD_OP_LOAD), StoreAction(VK_ATTACHMENT_STORE_OP_STORE)
+    {
+    }
+
+    explicit AVulkanRenderTargetView(AVulkanTexture* InTexture, VkAttachmentLoadOp InLoadAction)
+        : Texture(InTexture), MipIndex(0), ArraySliceIndex(-1), LoadAction(InLoadAction), StoreAction(VK_ATTACHMENT_STORE_OP_STORE)
+    {
+    }
+};
+
+struct ADepthRenderTargetView
+{
+    AVulkanTexture* Texture;
+
+    VkAttachmentLoadOp DepthLoadAction;
+    VkAttachmentStoreOp DepthStoreAction;
+    VkAttachmentLoadOp StencilLoadAction;
+    VkAttachmentStoreOp StencilStoreAction;
+
+    ADepthRenderTargetView()
+        : Texture(nullptr), DepthLoadAction(VK_ATTACHMENT_LOAD_OP_LOAD), DepthStoreAction(VK_ATTACHMENT_STORE_OP_STORE),
+          StencilLoadAction(VK_ATTACHMENT_LOAD_OP_LOAD), StencilStoreAction(VK_ATTACHMENT_STORE_OP_STORE)
+    {
+    }
+
+    explicit ADepthRenderTargetView(AVulkanTexture* InTexture, VkAttachmentLoadOp InLoadAction, VkAttachmentStoreOp InStoreAction)
+        : Texture(InTexture), DepthLoadAction(InLoadAction), DepthStoreAction(InStoreAction), StencilLoadAction(InLoadAction), StencilStoreAction(InStoreAction)
+    {
+    }
+
+    explicit ADepthRenderTargetView(AVulkanTexture* InTexture, VkAttachmentLoadOp InDepthLoadAction, VkAttachmentStoreOp InDepthStoreAction,
+        VkAttachmentLoadOp InStencilLoadAction, VkAttachmentStoreOp InStencilStoreAction)
+        : Texture(InTexture), DepthLoadAction(InDepthLoadAction), DepthStoreAction(InDepthStoreAction), StencilLoadAction(InStencilLoadAction),
+          StencilStoreAction(InStencilStoreAction)
     {
     }
 };
@@ -123,7 +156,7 @@ struct AVulkanRenderTargetsInfo
     // FVulkanRenderTargetView ResolveRenderTarget[MaxSimultaneousRenderTargets]; // Unused.
     // bool bHasResolveAttachments;                                               // Unused.
 
-    AVulkanRenderTargetView DepthStencilRenderTarget;
+    ADepthRenderTargetView DepthStencilRenderTarget;
     bool bClearDepth;
     bool bClearStencil;
 
@@ -141,6 +174,17 @@ public:
     inline const VkAttachmentReference* GetColorAttachmentReferences() const { return NumColorAttachments > 0 ? ColorReferences : nullptr; }
     inline const VkAttachmentReference* GetDepthStencilAttachmentReference() const { return bHasDepthStencil ? &DepthStencilReference : nullptr; }
     inline const VkAttachmentDescription* GetAttachmentDescriptions() const { return Desc; }
+
+    inline uint64_t GetHash() const { return Hash; }
+
+private:
+    struct AHashInfo
+    {
+        // +1 for Depth, +1 for Stencil
+        VkAttachmentLoadOp LoadOps[MaxSimultaneousRenderTargets + 2];
+        VkAttachmentStoreOp StoreOps[MaxSimultaneousRenderTargets + 2];
+    };
+    uint64_t Hash;
 
 public:
     bool bHasDepthStencil;
@@ -230,6 +274,7 @@ class AVulkanLayoutManager
 {
 public:
     AVulkanLayoutManager() : CurrentRenderPass(nullptr), CurrentFramebuffer(nullptr) {}
+    ~AVulkanLayoutManager();
 
     AVulkanRenderPass* GetOrCreateRenderPass(AVulkanDevice* Device, const AVulkanRenderTargetLayout& RTLayout);
 
