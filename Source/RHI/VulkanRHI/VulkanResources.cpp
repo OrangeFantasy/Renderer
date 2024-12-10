@@ -13,6 +13,61 @@ static constexpr const VkImageTiling VulkanViewTypeTilingMode[VK_IMAGE_VIEW_TYPE
     VK_IMAGE_TILING_OPTIMAL, // VK_IMAGE_VIEW_TYPE_CUBE_ARRAY
 };
 
+void AVulkanTextureView::Create(AVulkanDevice* Device, VkImage InImage, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, VkFormat Format,
+    uint32_t FirstMip, uint32_t NumMips, uint32_t ArraySliceIndex, uint32_t NumArraySlices)
+{
+    Image = InImage;
+
+    VkImageViewCreateInfo ViewInfo;
+    ZeroVulkanStruct(ViewInfo, VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
+    ViewInfo.image = InImage;
+    ViewInfo.viewType = ViewType;
+    ViewInfo.format = Format;
+
+    ViewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    ViewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    ViewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    ViewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+    ViewInfo.subresourceRange.aspectMask = AspectFlags;
+    ViewInfo.subresourceRange.baseMipLevel = FirstMip;
+    ViewInfo.subresourceRange.levelCount = NumMips;
+    ViewInfo.subresourceRange.baseArrayLayer = ArraySliceIndex;
+
+    switch (ViewType)
+    {
+    case VK_IMAGE_VIEW_TYPE_3D:
+        ViewInfo.subresourceRange.layerCount = 1;
+        break;
+    case VK_IMAGE_VIEW_TYPE_CUBE:
+        check(NumArraySlices == 1, "View type is VK_IMAGE_VIEW_TYPE_CUBE, but NumArraySlices != 1");
+        ViewInfo.subresourceRange.layerCount = 6;
+        break;
+    case VK_IMAGE_VIEW_TYPE_CUBE_ARRAY:
+        ViewInfo.subresourceRange.layerCount = 6 * NumArraySlices;
+        break;
+    case VK_IMAGE_VIEW_TYPE_1D_ARRAY:
+    case VK_IMAGE_VIEW_TYPE_2D_ARRAY:
+        ViewInfo.subresourceRange.layerCount = NumArraySlices;
+        break;
+    default:
+        ViewInfo.subresourceRange.layerCount = 1;
+        break;
+    }
+
+    VK_CHECK_RESULT(VulkanApi::vkCreateImageView(Device->GetHandle(), &ViewInfo, VK_CPU_ALLOCATOR, &View));
+}
+
+void AVulkanTextureView::Destory(AVulkanDevice* Device)
+{
+    if (View)
+    {
+        VulkanApi::vkDestroyImageView(Device->GetHandle(), View, VK_CPU_ALLOCATOR);
+        View = VK_NULL_HANDLE;
+        Image = VK_NULL_HANDLE;
+    }
+}
+
 AVulkanSurface::AVulkanSurface(AVulkanDevice* InDevice, VkImageViewType InViewType, VkFormat InFormat, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ,
     uint32_t InArraySize, uint32_t InNumMips, uint32_t InNumSamples, VkImageAspectFlags InAspectFlags)
     : Super(InDevice), ViewType(InViewType), PixelFormat(InFormat), Width(SizeX), Height(SizeY), Depth(SizeZ), ArraySize(InArraySize), NumMips(InNumMips),
@@ -147,93 +202,36 @@ AVulkanSurface::~AVulkanSurface()
     }
 }
 
-AVulkanTextureView::AVulkanTextureView(AVulkanDevice* InDevice, VkImage InImage, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, VkFormat Format,
-    uint32_t FirstMip, uint32_t NumMips, uint32_t ArraySliceIndex, uint32_t NumArraySlices)
-    : Super(InDevice), Image(InImage)
-{
-    VkImageViewCreateInfo ViewInfo;
-    ZeroVulkanStruct(ViewInfo, VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
-    ViewInfo.image = InImage;
-    ViewInfo.viewType = ViewType;
-    ViewInfo.format = Format;
-
-    ViewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    ViewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    ViewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    ViewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-    ViewInfo.subresourceRange.aspectMask = AspectFlags;
-    ViewInfo.subresourceRange.baseMipLevel = FirstMip;
-    ViewInfo.subresourceRange.levelCount = NumMips;
-    ViewInfo.subresourceRange.baseArrayLayer = ArraySliceIndex;
-
-    switch (ViewType)
-    {
-    case VK_IMAGE_VIEW_TYPE_3D:
-        ViewInfo.subresourceRange.layerCount = 1;
-        break;
-    case VK_IMAGE_VIEW_TYPE_CUBE:
-        check(NumArraySlices == 1, "View type is VK_IMAGE_VIEW_TYPE_CUBE, but NumArraySlices != 1");
-        ViewInfo.subresourceRange.layerCount = 6;
-        break;
-    case VK_IMAGE_VIEW_TYPE_CUBE_ARRAY:
-        ViewInfo.subresourceRange.layerCount = 6 * NumArraySlices;
-        break;
-    case VK_IMAGE_VIEW_TYPE_1D_ARRAY:
-    case VK_IMAGE_VIEW_TYPE_2D_ARRAY:
-        ViewInfo.subresourceRange.layerCount = NumArraySlices;
-        break;
-    default:
-        ViewInfo.subresourceRange.layerCount = 1;
-        break;
-    }
-
-    VK_CHECK_RESULT(VulkanApi::vkCreateImageView(Device->GetHandle(), &ViewInfo, VK_CPU_ALLOCATOR, &View));
-}
-
-AVulkanTextureView::~AVulkanTextureView()
-{
-    if (View)
-    {
-        VulkanApi::vkDestroyImageView(Device->GetHandle(), View, VK_CPU_ALLOCATOR);
-        View = VK_NULL_HANDLE;
-        Image = VK_NULL_HANDLE;
-    }
-}
-
 AVulkanTexture::AVulkanTexture(AVulkanDevice* InDevice, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ,
     uint32_t ArraySize, uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags)
-    : Super(InDevice), Surface(nullptr), TextureView(nullptr)
+    : Super(InDevice), Surface(Device, ViewType, Format, SizeX, SizeY, SizeZ, ArraySize, NumMips, NumSamples, AspectFlags)
 {
-    Surface = new AVulkanSurface(Device, ViewType, Format, SizeX, SizeY, SizeZ, ArraySize, NumMips, NumSamples, AspectFlags);
-    Surface->OwningTexture = this;
-    check(Surface->PixelFormat != VK_FORMAT_UNDEFINED, "Undefined pixel format.");
+    Surface.OwningTexture = this;
+    check(Surface.PixelFormat != VK_FORMAT_UNDEFINED, "Undefined pixel format.");
 
     bool bIsArray = ViewType == VK_IMAGE_VIEW_TYPE_1D_ARRAY || ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY || ViewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
-    TextureView = new AVulkanTextureView(Device, Surface->Image, ViewType, Surface->AspectMask, Surface->PixelFormat, 0, std::max(NumMips, 1u), 0,
+    TextureView.Create(Device, Surface.Image, ViewType, Surface.AspectMask, Surface.PixelFormat, 0, std::max(NumMips, 1u), 0,
         bIsArray ? std::max(1u, ArraySize) : std::max(1u, SizeZ));
 }
 
 AVulkanTexture::AVulkanTexture(AVulkanDevice* InDevice, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ,
     uint32_t ArraySize, uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags, VkImage Image)
-    : Super(InDevice), Surface(nullptr), TextureView(nullptr)
+    : Super(InDevice), Surface(Device, ViewType, Format, SizeX, SizeY, SizeZ, ArraySize, NumMips, NumSamples, AspectFlags, Image)
 {
-    Surface = new AVulkanSurface(Device, ViewType, Format, SizeX, SizeY, SizeZ, ArraySize, NumMips, NumSamples, AspectFlags, Image);
-    Surface->OwningTexture = this;
-    check(Surface->PixelFormat != VK_FORMAT_UNDEFINED, "Undefined pixel format.");
+    Surface.OwningTexture = this;
+    check(Surface.PixelFormat != VK_FORMAT_UNDEFINED, "Undefined pixel format.");
 
-    bool bIsArray = ViewType == VK_IMAGE_VIEW_TYPE_1D_ARRAY || ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY || ViewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
-    TextureView = new AVulkanTextureView(Device, Image, ViewType, Surface->AspectMask, Surface->PixelFormat, 0, std::max(NumMips, 1u), 0,
-        bIsArray ? std::max(1u, ArraySize) : std::max(1u, SizeZ));
+    if (ViewType != VK_IMAGE_VIEW_TYPE_MAX_ENUM && Surface.Image != VK_NULL_HANDLE)
+    {
+        bool bIsArray = ViewType == VK_IMAGE_VIEW_TYPE_1D_ARRAY || ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY || ViewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+        TextureView.Create(Device, Image, ViewType, Surface.AspectMask, Surface.PixelFormat, 0, std::max(NumMips, 1u), 0,
+            bIsArray ? std::max(1u, ArraySize) : std::max(1u, SizeZ));
+    }
 }
 
 AVulkanTexture::~AVulkanTexture()
 {
-    delete TextureView;
-    TextureView = nullptr;
-
-    delete Surface;
-    Surface = nullptr;
+    TextureView.Destory(Device);
 }
 
 AVulkanTexture2D::AVulkanTexture2D(
@@ -270,25 +268,25 @@ AVulkanRenderTargetLayout::AVulkanRenderTargetLayout(const AVulkanRenderTargetsI
         const AVulkanRenderTargetView& RTView = RTInfo.ColorRenderTarget[Index];
         if (AVulkanTexture* Texture = RTView.Texture)
         {
-            AVulkanSurface* Surface = Texture->Surface;
+            const AVulkanSurface& Surface = Texture->Surface;
 
-            check(!NumSamples || NumSamples == Surface->NumSamples);
-            NumSamples = Surface->NumSamples;
+            check(!NumSamples || NumSamples == Surface.NumSamples);
+            NumSamples = Surface.NumSamples;
 
             if (bSetExtent)
             {
-                check(Extent.width == std::max(1u, Surface->Width));
-                check(Extent.height == std::max(1u, Surface->Height));
+                check(Extent.width == std::max(1u, Surface.Width));
+                check(Extent.height == std::max(1u, Surface.Height));
             }
             else
             {
                 bSetExtent = true;
-                Extent.width = Surface->Width;
-                Extent.height = Surface->Height;
+                Extent.width = Surface.Width;
+                Extent.height = Surface.Height;
             }
 
             VkAttachmentDescription& CurrDesc = Desc[NumAttachmentDescriptions];
-            CurrDesc.format = Surface->PixelFormat;
+            CurrDesc.format = Surface.PixelFormat;
             CurrDesc.samples = VK_SAMPLE_COUNT_1_BIT;
             CurrDesc.loadOp = RTView.LoadAction;
             CurrDesc.storeOp = RTView.StoreAction;
@@ -317,21 +315,21 @@ AVulkanRenderTargetLayout::AVulkanRenderTargetLayout(const AVulkanRenderTargetsI
         AVulkanTexture* Texture = RTView.Texture;
         check(Texture);
 
-        AVulkanSurface* Surface = Texture->Surface;
-        check(!NumSamples || NumSamples == Surface->NumSamples);
-        NumSamples = Surface->NumSamples;
+        const AVulkanSurface& Surface = Texture->Surface;
+        check(!NumSamples || NumSamples == Surface.NumSamples);
+        NumSamples = Surface.NumSamples;
 
         if (bSetExtent)
         {
             // Depth can be greater or equal to color. Clamp to the smaller size.
-            Extent.width = std::min(Extent.width, Surface->Width);
-            Extent.height = std::min(Extent.height, Surface->Height);
+            Extent.width = std::min(Extent.width, Surface.Width);
+            Extent.height = std::min(Extent.height, Surface.Height);
         }
         else
         {
             bSetExtent = true;
-            Extent.width = Surface->Width;
-            Extent.height = Surface->Height;
+            Extent.width = Surface.Width;
+            Extent.height = Surface.Height;
         }
 
         VkAttachmentDescription& CurrDesc = Desc[NumAttachmentDescriptions];
@@ -388,19 +386,19 @@ AVulkanRenderTargetLayout::AVulkanRenderTargetLayout(const AVulkanRenderTargetsI
 //         {
 //             CVulkanSurface* Surface = Texture->Surface;
 //
-//             check(!NumSamples || NumSamples == Surface->NumSamples);
-//             NumSamples = Surface->NumSamples;
+//             check(!NumSamples || NumSamples == Surface.NumSamples);
+//             NumSamples = Surface.NumSamples;
 //
 //             if (bSetExtent)
 //             {
-//                 check(Extent.width == std::max(1u, Surface->Width));
-//                 check(Extent.height == std::max(1u, Surface->Height));
+//                 check(Extent.width == std::max(1u, Surface.Width));
+//                 check(Extent.height == std::max(1u, Surface.Height));
 //             }
 //             else
 //             {
 //                 bSetExtent = true;
-//                 Extent.width = Surface->Width;
-//                 Extent.height = Surface->Height;
+//                 Extent.width = Surface.Width;
+//                 Extent.height = Surface.Height;
 //             }
 //
 //             VkAttachmentDescription& CurrDesc = Desc[NumAttachmentDescriptions];
@@ -432,20 +430,20 @@ AVulkanRenderTargetLayout::AVulkanRenderTargetLayout(const AVulkanRenderTargetsI
 //         check(Texture);
 //
 //         CVulkanSurface* Surface = Texture->Surface;
-//         check(!NumSamples || NumSamples == Surface->NumSamples);
-//         NumSamples = Surface->NumSamples;
+//         check(!NumSamples || NumSamples == Surface.NumSamples);
+//         NumSamples = Surface.NumSamples;
 //
 //         if (bSetExtent)
 //         {
 //             // Depth can be greater or equal to color. Clamp to the smaller size.
-//             Extent.width = std::min(Extent.width, Surface->Width);
-//             Extent.height = std::min(Extent.height, Surface->Height);
+//             Extent.width = std::min(Extent.width, Surface.Width);
+//             Extent.height = std::min(Extent.height, Surface.Height);
 //         }
 //         else
 //         {
 //             bSetExtent = true;
-//             Extent.width = Surface->Width;
-//             Extent.height = Surface->Height;
+//             Extent.width = Surface.Width;
+//             Extent.height = Surface.Height;
 //         }
 //
 //         VkAttachmentDescription& CurrDesc = Desc[NumAttachmentDescriptions];
@@ -630,19 +628,19 @@ AVulkanFramebuffer::AVulkanFramebuffer(
         AVulkanTexture* Texture = RTInfo.ColorRenderTarget[Index].Texture;
         if (Texture)
         {
-            AVulkanSurface* Surface = Texture->Surface;
-            check(Surface->Image != VK_NULL_HANDLE);
+            const AVulkanSurface& Surface = Texture->Surface;
+            check(Surface.Image != VK_NULL_HANDLE);
 
-            ColorRenderTargetImages[Index] = Surface->Image;
+            ColorRenderTargetImages[Index] = Surface.Image;
             MipIndex = RTInfo.ColorRenderTarget[Index].MipIndex;
 
-            AVulkanTextureView* RTView = nullptr;
-            if (Surface->ViewType == VK_IMAGE_VIEW_TYPE_2D || Surface->ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY)
+            AVulkanTextureView RTView;
+            if (Surface.ViewType == VK_IMAGE_VIEW_TYPE_2D || Surface.ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY)
             {
-                RTView = new AVulkanTextureView(Device, Surface->Image, Surface->ViewType, Surface->AspectMask, Surface->PixelFormat, MipIndex, 1,
-                    std::max(0, (int32_t)RTInfo.ColorRenderTarget[Index].ArraySliceIndex), Surface->NumOfArrayLevels());
+                RTView.Create(Device, Surface.Image, Surface.ViewType, Surface.AspectMask, Surface.PixelFormat, MipIndex, 1,
+                    std::max(0, (int32_t)RTInfo.ColorRenderTarget[Index].ArraySliceIndex), Surface.NumOfArrayLevels());
             }
-            check(RTView != nullptr, "Not Implement.");
+            check(RTView.View != VK_NULL_HANDLE, "Not Implement.");
 
             AttachmentTextureViews.Add(RTView);
             ++NumColorAttachments;
@@ -653,30 +651,29 @@ AVulkanFramebuffer::AVulkanFramebuffer(
 
     if (RTLayout.bHasDepthStencil)
     {
-        AVulkanTexture* Texture = RTInfo.DepthStencilRenderTarget.Texture;
+        const AVulkanTexture* Texture = RTInfo.DepthStencilRenderTarget.Texture;
         check(Texture);
 
-        AVulkanSurface* Surface = Texture->Surface;
-        check(Surface->Image != VK_NULL_HANDLE);
+        const AVulkanSurface& Surface = Texture->Surface;
+        check(Surface.Image != VK_NULL_HANDLE);
 
-        DepthStencilRenderTargetImage = Surface->Image;
+        DepthStencilRenderTargetImage = Surface.Image;
 
-        AVulkanTextureView* RTView = nullptr;
-        if (Surface->ViewType == VK_IMAGE_VIEW_TYPE_2D || Surface->ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY)
+        AVulkanTextureView RTView;
+        if (Surface.ViewType == VK_IMAGE_VIEW_TYPE_2D || Surface.ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY)
         {
             // depth attachments need a separate view to have no swizzle components, for validation correctness
-            RTView = new AVulkanTextureView(
-                Device, Surface->Image, Surface->ViewType, Surface->AspectMask, Surface->PixelFormat, MipIndex, 1, 0, Surface->NumOfArrayLevels());
+            RTView.Create(Device, Surface.Image, Surface.ViewType, Surface.AspectMask, Surface.PixelFormat, MipIndex, 1, 0, Surface.NumOfArrayLevels());
         }
-        check(RTView != nullptr, "Not Implement.");
+        check(RTView.View != VK_NULL_HANDLE, "Not Implement.");
 
         AttachmentTextureViews.Add(RTView);
     }
 
     TArray<VkImageView> AttachmentViews;
-    for (AVulkanTextureView* TextureView : AttachmentTextureViews)
+    for (AVulkanTextureView& TextureView : AttachmentTextureViews)
     {
-        AttachmentViews.Add(TextureView->View);
+        AttachmentViews.Add(TextureView.View);
     }
 
     VkFramebufferCreateInfo CreateInfo;
@@ -692,14 +689,13 @@ AVulkanFramebuffer::AVulkanFramebuffer(
 
 AVulkanFramebuffer::~AVulkanFramebuffer()
 {
+    for (AVulkanTextureView& TextureView: AttachmentTextureViews)
+    {
+        TextureView.Destory(Device);
+    }
+
     VulkanApi::vkDestroyFramebuffer(Device->GetHandle(), Framebuffer, VK_CPU_ALLOCATOR);
     Framebuffer = VK_NULL_HANDLE;
-
-    for (AVulkanTextureView* TextureView : AttachmentTextureViews)
-    {
-        delete TextureView;
-        TextureView = nullptr;
-    }
 }
 
 bool AVulkanFramebuffer::Matches(const AVulkanRenderTargetsInfo& RTInfo) const
@@ -714,7 +710,7 @@ bool AVulkanFramebuffer::Matches(const AVulkanRenderTargetsInfo& RTInfo) const
         if (B.Texture)
         {
             VkImage AImage = DepthStencilRenderTargetImage;
-            VkImage BImage = B.Texture->Surface->Image;
+            VkImage BImage = B.Texture->Surface.Image;
             if (AImage != BImage)
             {
                 return false;
@@ -729,7 +725,7 @@ bool AVulkanFramebuffer::Matches(const AVulkanRenderTargetsInfo& RTInfo) const
         if (B.Texture)
         {
             VkImage AImage = ColorRenderTargetImages[AttachementIndex];
-            VkImage BImage = B.Texture->Surface->Image;
+            VkImage BImage = B.Texture->Surface.Image;
             if (AImage != BImage)
             {
                 return false;

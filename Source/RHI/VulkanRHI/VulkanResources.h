@@ -6,6 +6,18 @@ class AVulkanDevice;
 class AVulkanCmdBuffer;
 struct AVulkanTexture;
 
+struct AVulkanTextureView
+{
+    AVulkanTextureView() : View(VK_NULL_HANDLE), Image(VK_NULL_HANDLE) {}
+
+    void Create(AVulkanDevice* Device, VkImage Image, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, VkFormat Format, uint32_t FirstMip,
+        uint32_t NumMips, uint32_t ArraySliceIndex, uint32_t NumArraySlices);
+    void Destory(AVulkanDevice* Device);
+
+    VkImageView View;
+    VkImage Image;
+};
+
 struct AVulkanDeviceChild
 {
     AVulkanDeviceChild(AVulkanDevice* InDevice = nullptr) : Device(InDevice) {}
@@ -16,16 +28,6 @@ struct AVulkanDeviceChild
 protected:
     AVulkanDevice* Device;
     using Super = AVulkanDeviceChild;
-};
-
-struct AVulkanTextureView : public AVulkanDeviceChild
-{
-    AVulkanTextureView(AVulkanDevice* Device, VkImage Image, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, VkFormat Format, uint32_t FirstMip,
-        uint32_t NumMips, uint32_t ArraySliceIndex, uint32_t NumArraySlices);
-    virtual ~AVulkanTextureView() override;
-
-    VkImageView View;
-    VkImage Image;
 };
 
 struct AVulkanSurface : public AVulkanDeviceChild
@@ -82,10 +84,8 @@ struct AVulkanTexture : public AVulkanDeviceChild
         uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags, VkImage Image);
     virtual ~AVulkanTexture() override;
 
-    inline VkFormat GetFormat() const { return Surface ? Surface->PixelFormat : VkFormat::VK_FORMAT_UNDEFINED; }
-
-    AVulkanSurface* Surface;
-    AVulkanTextureView* TextureView;
+    AVulkanSurface Surface;
+    AVulkanTextureView TextureView;
 };
 
 struct AVulkanTexture2D : public AVulkanTexture
@@ -236,7 +236,7 @@ public:
     inline uint32_t GetHeight() const { return Extents.height; }
 
 public:
-    TArray<AVulkanTextureView*> AttachmentTextureViews;
+    TArray<AVulkanTextureView> AttachmentTextureViews;
 
 private:
     VkFramebuffer Framebuffer;

@@ -25,7 +25,9 @@ public:
 
     void RecreateSwapchain(void* WindowHandle);
 
-    int32_t AcquireImageIndex();
+    AVulkanTexture2D* GetBackBuffer();
+    void ClearBackBuffer();
+
     bool Present(AVulkanCmdBuffer* CmdBuffer, AVulkanQueue* Queue, AVulkanQueue* PresentQueue);
 
     inline AVulkanSwapChain* GetSwapChain() const { return SwapChain; }
@@ -37,6 +39,9 @@ private:
     void DestroySwapchain(struct AVulkanSwapChainRecreateInfo* RecreateInfo);
 
     void Resize(uint32_t SizeX, uint32_t SizeY, bool bIsFullscreen);
+
+    void AcquireImageIndex();
+    void AcquireBackBufferImage();
 
 public:
     enum
@@ -52,11 +57,12 @@ public:
     AVulkanSwapChain* SwapChain;
 
     TArray<VkImage> BackBufferImages;
-    TArray<AVulkanTextureView*> TextureViews;
+    TArray<AVulkanSemaphore*> RenderingDoneSemaphores; // new in this.
+    TArray<AVulkanTextureView> TextureViews;
+    AVulkanTexture2D* BackBuffer;
 
     int32_t AcquiredImageIndex;
-    AVulkanSemaphore* AcquiredSemaphore;               // new in SwapChain.
-    TArray<AVulkanSemaphore*> RenderingDoneSemaphores; // new in this.
+    AVulkanSemaphore* AcquiredSemaphore; // new in SwapChain.
 
     VkViewport Viewport;
     VkRect2D Scissor;

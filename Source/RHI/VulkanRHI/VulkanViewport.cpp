@@ -10,7 +10,7 @@
 
 AVulkanViewport::AVulkanViewport(AVulkanRHI* InRHI, AVulkanDevice* InDevice, void* InWindowHandle, uint32_t InSizeX, uint32_t InSizeY, bool bInIsFullscreen)
     : RHI(InRHI), Device(InDevice), WindowHandle(InWindowHandle), SwapChain(nullptr), SizeX(InSizeX), SizeY(InSizeY), bIsFullscreen(bInIsFullscreen),
-      AcquiredImageIndex(0), AcquiredSemaphore(nullptr)
+      AcquiredSemaphore(nullptr), BackBuffer(nullptr)
 {
     AMemory::Memzero(BackBufferImages);
     AMemory::Memzero(Viewport);
@@ -27,11 +27,17 @@ AVulkanViewport::AVulkanViewport(AVulkanRHI* InRHI, AVulkanDevice* InDevice, voi
 
 AVulkanViewport::~AVulkanViewport()
 {
+    {
+        ClearBackBuffer();
+
+        delete BackBuffer;
+        BackBuffer = nullptr;
+    }
+
     for (int32_t Index = 0; Index < NUM_BUFFERS; ++Index)
     {
-        AVulkanTextureView* TextureView = TextureViews[Index];
-        delete TextureView;
-        TextureView = nullptr;
+        AVulkanTextureView& TextureView = TextureViews[Index];
+        TextureView.Destory(Device);
 
         AVulkanSemaphore* Semaphore = RenderingDoneSemaphores[Index];
         delete Semaphore;
@@ -54,31 +60,69 @@ void AVulkanViewport::CreateSwapchain(AVulkanSwapChainRecreateInfo* RecreateInfo
     TextureViews.Resize(NUM_BUFFERS);
     for (int32_t Index = 0; Index < NUM_BUFFERS; ++Index)
     {
-        TextureViews[Index] =
-            new AVulkanTextureView(Device, BackBufferImages[Index], VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT, SwapChain->ImageFormat, 0, 1, 0, 1);
+        TextureViews[Index].Create(Device, BackBufferImages[Index], VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT, SwapChain->ImageFormat, 0, 1, 0, 1);
     }
 
+    BackBuffer = new AVulkanTexture2D(Device, GetSwapchainImageFormat(), SizeX, SizeY, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT, VK_NULL_HANDLE);
     AcquiredImageIndex = -1;
 }
 
 void AVulkanViewport::DestroySwapchain(AVulkanSwapChainRecreateInfo* RecreateInfo)
 {
-     Device->WaitUntilIdle();
-    
-     if (SwapChain)
-     {
-         SwapChain->Destroy(RecreateInfo);
-         delete SwapChain;
-         SwapChain = nullptr;
-     }
-    
-     AcquiredImageIndex = -1;
+    Device->WaitUntilIdle();
+
+    delete BackBuffer;
+    BackBuffer = nullptr;
+
+    if (SwapChain)
+    {
+        SwapChain->Destroy(RecreateInfo);
+        delete SwapChain;
+        SwapChain = nullptr;
+    }
+
+    AcquiredImageIndex = -1;
 }
 
-int32_t AVulkanViewport::AcquireImageIndex()
+void AVulkanViewport::AcquireImageIndex()
 {
     AcquiredImageIndex = SwapChain->AcquireImageIndex(&AcquiredSemaphore);
-    return AcquiredImageIndex;
+}
+
+void AVulkanViewport::AcquireBackBufferImage()
+{
+    AVulkanSurface& Surface = BackBuffer->Surface;
+    if (Surface.Image == VK_NULL_HANDLE)
+    {
+        AVulkanTextureView& TextureView = BackBuffer->TextureView;
+
+        check(AcquiredImageIndex == -1); //-V595
+        AcquireImageIndex();             //-V595
+        check(AcquiredImageIndex >= 0 && AcquiredImageIndex < TextureViews.Num());
+
+        AVulkanTextureView& ImageView = TextureViews[AcquiredImageIndex];
+        Surface.Image = ImageView.Image;
+        TextureView.View = ImageView.View;
+
+        // AVulkanCommandBufferManager* CmdBufferManager = RHI->GetCommandBufferManager();
+        // AVulkanCmdBuffer* CmdBuffer = CmdBufferManager->GetActiveCmdBuffer();
+        // check(!CmdBuffer->IsInsideRenderPass());
+
+        // Wait for semaphore signal before writing to backbuffer image
+        // CmdBuffer->AddWaitSemaphore(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, AcquiredSemaphore);
+    }
+}
+
+AVulkanTexture2D* AVulkanViewport::GetBackBuffer()
+{
+    AcquireBackBufferImage();
+    return BackBuffer;
+}
+
+void AVulkanViewport::ClearBackBuffer()
+{
+    BackBuffer->TextureView.View = VK_NULL_HANDLE;
+    BackBuffer->Surface.Image = VK_NULL_HANDLE;
 }
 
 bool AVulkanViewport::Present(AVulkanCmdBuffer* CmdBuffer, AVulkanQueue* Queue, AVulkanQueue* PresentQueue)

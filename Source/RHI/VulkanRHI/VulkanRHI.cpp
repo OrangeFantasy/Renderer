@@ -43,12 +43,12 @@ AVulkanRHI::AVulkanRHI() : Instance(VK_NULL_HANDLE), Device(nullptr), Viewport(n
 
 AVulkanRHI::~AVulkanRHI()
 {
-    for (AVulkanTexture2D* ColorTexture : ColorTextures)
-    {
-        ColorTexture->Surface->Image = VK_NULL_HANDLE;
-        delete ColorTexture;
-        ColorTexture = nullptr;
-    }
+    //for (AVulkanTexture2D* ColorTexture : ColorTextures)
+    //{
+    //    ColorTexture->Surface.Image = VK_NULL_HANDLE;
+    //    delete ColorTexture;
+    //    ColorTexture = nullptr;
+    //}
 
     // for (CVulkanRenderPass* Pass : RenderPasses)
     // {
@@ -270,9 +270,9 @@ void AVulkanRHI::InitizlizeContext(const AViewportInfo& ViewportInfo)
 
     for (int32_t Index = 0; Index < Viewport->NUM_BUFFERS; ++Index)
     {
-        AVulkanTexture2D* ColorTexture = new AVulkanTexture2D(
-            Device, Viewport->GetSwapchainImageFormat(), Viewport->SizeX, Viewport->SizeY, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT, Viewport->BackBufferImages[Index]);
-        ColorTextures.Add(ColorTexture);
+        //AVulkanTexture2D* ColorTexture = new AVulkanTexture2D(
+        //    Device, Viewport->GetSwapchainImageFormat(), Viewport->SizeX, Viewport->SizeY, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT, Viewport->BackBufferImages[Index]);
+        //ColorTextures.Add(ColorTexture);
 
         // AVulkanRenderTargetsInfo RTInfo;
         // RTInfo.NumColorRenderTargets = 1;
@@ -325,19 +325,21 @@ void AVulkanRHI::EndDrawing()
     /*   CmdBuffer->End();*/
 
     Viewport->Present(CmdBuffer, Device->GetGraphicsQueue(), Device->GetPresentQueue());
+    Viewport->ClearBackBuffer();
 }
 
 void AVulkanRHI::BeginRenderPass()
 {
     AVulkanCmdBuffer* CmdBuffer = CommandBufferManager->GetActiveCmdBuffer();
 
-    int32_t ImageIndex = Viewport->AcquireImageIndex();
+    //int32_t ImageIndex = Viewport->AcquiredImageIndex;
+    AVulkanTexture* BackBuffer = Viewport->GetBackBuffer();
 
     AVulkanRenderTargetsInfo RTInfo;
     RTInfo.NumColorRenderTargets = 1;
 
     AVulkanRenderTargetView& ColorRTView = RTInfo.ColorRenderTarget[0];
-    ColorRTView.Texture = ColorTextures[ImageIndex];
+    ColorRTView.Texture = BackBuffer;
     ColorRTView.LoadAction = VK_ATTACHMENT_LOAD_OP_CLEAR;
     ColorRTView.StoreAction = VK_ATTACHMENT_STORE_OP_STORE;
 
