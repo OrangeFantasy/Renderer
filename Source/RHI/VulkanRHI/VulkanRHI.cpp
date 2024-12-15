@@ -43,12 +43,12 @@ AVulkanRHI::AVulkanRHI() : Instance(VK_NULL_HANDLE), Device(nullptr), Viewport(n
 
 AVulkanRHI::~AVulkanRHI()
 {
-    //for (AVulkanTexture2D* ColorTexture : ColorTextures)
+    // for (AVulkanTexture2D* ColorTexture : ColorTextures)
     //{
-    //    ColorTexture->Surface.Image = VK_NULL_HANDLE;
-    //    delete ColorTexture;
-    //    ColorTexture = nullptr;
-    //}
+    //     ColorTexture->Surface.Image = VK_NULL_HANDLE;
+    //     delete ColorTexture;
+    //     ColorTexture = nullptr;
+    // }
 
     // for (CVulkanRenderPass* Pass : RenderPasses)
     // {
@@ -64,9 +64,10 @@ AVulkanRHI::~AVulkanRHI()
     delete Pipeline;
     Pipeline = nullptr;
 
+    delete PipelineStateManager;
+    PipelineStateManager = nullptr;
     delete LayoutManager;
     LayoutManager = nullptr;
-
     delete CommandBufferManager;
     CommandBufferManager = nullptr;
 
@@ -95,6 +96,7 @@ void AVulkanRHI::Initizlize()
     SelectAndInitizlizeDevice();
 
     CommandBufferManager = new AVulkanCommandBufferManager(Device);
+    PipelineStateManager = new AVulkanPipelineStateManager(Device);
     LayoutManager = new AVulkanLayoutManager();
     Pipeline = nullptr;
 }
@@ -270,9 +272,10 @@ void AVulkanRHI::InitizlizeContext(const AViewportInfo& ViewportInfo)
 
     for (int32_t Index = 0; Index < Viewport->NUM_BUFFERS; ++Index)
     {
-        //AVulkanTexture2D* ColorTexture = new AVulkanTexture2D(
-        //    Device, Viewport->GetSwapchainImageFormat(), Viewport->SizeX, Viewport->SizeY, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT, Viewport->BackBufferImages[Index]);
-        //ColorTextures.Add(ColorTexture);
+        // AVulkanTexture2D* ColorTexture = new AVulkanTexture2D(
+        //     Device, Viewport->GetSwapchainImageFormat(), Viewport->SizeX, Viewport->SizeY, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT,
+        //     Viewport->BackBufferImages[Index]);
+        // ColorTextures.Add(ColorTexture);
 
         // AVulkanRenderTargetsInfo RTInfo;
         // RTInfo.NumColorRenderTargets = 1;
@@ -332,7 +335,7 @@ void AVulkanRHI::BeginRenderPass()
 {
     AVulkanCmdBuffer* CmdBuffer = CommandBufferManager->GetActiveCmdBuffer();
 
-    //int32_t ImageIndex = Viewport->AcquiredImageIndex;
+    // int32_t ImageIndex = Viewport->AcquiredImageIndex;
     AVulkanTexture* BackBuffer = Viewport->GetBackBuffer();
 
     AVulkanRenderTargetsInfo RTInfo;

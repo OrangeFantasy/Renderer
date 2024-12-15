@@ -5,6 +5,8 @@
 class AVulkanRHI;
 class AVulkanQueue;
 class AVulkanFenceManager;
+class AVulkanShaderManager;
+class AVulkanPipelineStateManager;
 
 class AVulkanDevice
 {
@@ -31,6 +33,7 @@ public:
     inline AVulkanQueue* GetPresentQueue() const { return PresentQueue; }
 
     inline AVulkanFenceManager* GetFenceManager() const { return FenceManager; }
+    inline AVulkanShaderManager* GetShaderManager() const { return ShaderManager; }
 
 private:
     void QueryGpu();
@@ -57,6 +60,7 @@ private:
     TArray<const AnsiChar*> ValidationLayers;
 
     AVulkanFenceManager* FenceManager;
+    AVulkanShaderManager* ShaderManager;
 
     AVulkanRHI* RHI;
     friend AVulkanRHI;

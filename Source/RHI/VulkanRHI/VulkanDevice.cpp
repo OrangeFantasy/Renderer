@@ -3,10 +3,11 @@
 #include "VulkanRHI.h"
 #include "VulkanQueue.h"
 #include "VulkanMemory.h"
+#include "VulkanPipeline.h"
 
 AVulkanDevice::AVulkanDevice(AVulkanRHI* InRHI, VkPhysicalDevice InGpu)
     : RHI(InRHI), Device(VK_NULL_HANDLE), Gpu(InGpu), GfxQueue(nullptr), ComputeQueue(nullptr), TransferQueue(nullptr), PresentQueue(nullptr),
-      FenceManager(nullptr)
+      FenceManager(nullptr), ShaderManager(nullptr)
 {
     AMemory::Memzero(GpuProps);
     AMemory::Memzero(PhysicalFeatures);
@@ -34,6 +35,7 @@ void AVulkanDevice::Initizlize()
     SetupFormats();
 
     FenceManager = new AVulkanFenceManager(this);
+    ShaderManager = new AVulkanShaderManager(this);
 }
 
 void AVulkanDevice::QueryGpu()
@@ -181,17 +183,17 @@ void AVulkanDevice::SetupPresentQueue(VkSurfaceKHR Surface)
 
 void AVulkanDevice::Destory()
 {
-    delete TransferQueue;
-    TransferQueue = nullptr;
-
-    delete ComputeQueue;
-    ComputeQueue = nullptr;
-
-    delete GfxQueue;
-    GfxQueue = nullptr;
-
+    delete ShaderManager;
+    ShaderManager = nullptr;
     delete FenceManager;
     FenceManager = nullptr;
+
+    delete TransferQueue;
+    TransferQueue = nullptr;
+    delete ComputeQueue;
+    ComputeQueue = nullptr;
+    delete GfxQueue;
+    GfxQueue = nullptr;
 
     VulkanApi::vkDestroyDevice(Device, nullptr);
     Device = VK_NULL_HANDLE;

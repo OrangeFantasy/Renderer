@@ -689,7 +689,7 @@ AVulkanFramebuffer::AVulkanFramebuffer(
 
 AVulkanFramebuffer::~AVulkanFramebuffer()
 {
-    for (AVulkanTextureView& TextureView: AttachmentTextureViews)
+    for (AVulkanTextureView& TextureView : AttachmentTextureViews)
     {
         TextureView.Destory(Device);
     }
@@ -811,81 +811,3 @@ AVulkanFramebuffer* AVulkanLayoutManager::GetOrCreateFramebuffer(
 //
 //     CurrentRenderPass = nullptr;
 // }
-
-AVulkanRenderPass::AVulkanRenderPass(AVulkanDevice* InDevice)
-    : RenderPass(VK_NULL_HANDLE), Device(InDevice), Layout(AVulkanRenderTargetsInfo()), NumUsedClearValues(0)
-{
-    uint32_t NumSubpasses = 0;
-    uint32_t NumDependencies = 0;
-
-    VkSubpassDescription SubpassDescriptions[4];
-    AMemory::Memzero(SubpassDescriptions);
-    VkSubpassDependency SubpassDependencies[4];
-    AMemory::Memzero(SubpassDependencies);
-
-    VkAttachmentReference ColorAttachmentRef;
-    AMemory::Memzero(ColorAttachmentRef);
-    ColorAttachmentRef.attachment = 0;
-    ColorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    // main sub-pass
-    {
-        VkSubpassDescription& SubpassDesc = SubpassDescriptions[NumSubpasses++];
-        AMemory::Memzero(&SubpassDesc, sizeof(VkSubpassDescription));
-        SubpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        SubpassDesc.colorAttachmentCount = 1;
-        SubpassDesc.pColorAttachments = &ColorAttachmentRef;
-        // SubpassDesc.pResolveAttachments = bDepthReadSubpass ? nullptr : RTLayout.GetResolveAttachmentReferences();
-        // SubpassDesc.pDepthStencilAttachment = RTLayout.GetDepthStencilAttachmentReference();
-    }
-
-    VkAttachmentDescription AttachmentDesc = {};
-    AttachmentDesc.format = VK_FORMAT_B8G8R8A8_SRGB;
-    AttachmentDesc.samples = VK_SAMPLE_COUNT_1_BIT;
-    AttachmentDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    AttachmentDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    AttachmentDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    AttachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    AttachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    AttachmentDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    VkRenderPassCreateInfo CreateInfo;
-    ZeroVulkanStruct(CreateInfo, VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO);
-    CreateInfo.attachmentCount = 1;
-    CreateInfo.pAttachments = &AttachmentDesc;
-    CreateInfo.subpassCount = NumSubpasses;
-    CreateInfo.pSubpasses = SubpassDescriptions;
-    CreateInfo.dependencyCount = NumDependencies;
-    CreateInfo.pDependencies = SubpassDependencies;
-
-    VK_CHECK_RESULT(VulkanApi::vkCreateRenderPass(InDevice->GetHandle(), &CreateInfo, VK_CPU_ALLOCATOR, &RenderPass));
-}
-
-AVulkanFramebuffer_Old::AVulkanFramebuffer_Old(AVulkanDevice* InDevice, AVulkanRenderPass* InRenderPass, VkImageView InView, VkExtent2D InExtents)
-    : AVulkanFramebuffer_Old(InDevice, InRenderPass, TArray<VkImageView>({InView}), InExtents)
-{
-}
-
-AVulkanFramebuffer_Old::AVulkanFramebuffer_Old(
-    AVulkanDevice* InDevice, AVulkanRenderPass* InRenderPass, const TArray<VkImageView>& InViews, VkExtent2D InExtents)
-    : Device(InDevice), RenderPass(InRenderPass)
-{
-    Extents.width = InExtents.width;
-    Extents.height = InExtents.height;
-
-    VkFramebufferCreateInfo CreateInfo;
-    ZeroVulkanStruct(CreateInfo, VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO);
-    CreateInfo.renderPass = RenderPass->GetHandle();
-    CreateInfo.attachmentCount = static_cast<uint32_t>(InViews.Num());
-    CreateInfo.pAttachments = InViews.GetData();
-    CreateInfo.width = Extents.width;
-    CreateInfo.height = Extents.height;
-    CreateInfo.layers = 1;
-
-    VK_CHECK_RESULT(VulkanApi::vkCreateFramebuffer(Device->GetHandle(), &CreateInfo, VK_CPU_ALLOCATOR, &Framebuffer));
-}
-
-AVulkanFramebuffer_Old::~AVulkanFramebuffer_Old()
-{
-    VulkanApi::vkDestroyFramebuffer(Device->GetHandle(), Framebuffer, VK_CPU_ALLOCATOR);
-}

@@ -209,7 +209,6 @@ private:
 class AVulkanRenderPass
 {
 public:
-    AVulkanRenderPass(AVulkanDevice* Device);
     AVulkanRenderPass(AVulkanDevice* Device, const AVulkanRenderTargetLayout& RTLayout);
     ~AVulkanRenderPass();
 
@@ -248,25 +247,6 @@ private:
     VkImage ColorRenderTargetImages[MaxSimultaneousRenderTargets];
     VkImage DepthStencilRenderTargetImage;
 
-    AVulkanDevice* Device;
-};
-
-class AVulkanFramebuffer_Old
-{
-public:
-    AVulkanFramebuffer_Old(AVulkanDevice* InDevice, AVulkanRenderPass* InRenderPass, VkImageView InView, VkExtent2D InExtents);
-    AVulkanFramebuffer_Old(AVulkanDevice* InDevice, AVulkanRenderPass* InRenderPass, const TArray<VkImageView>& InViews, VkExtent2D InExtents);
-    ~AVulkanFramebuffer_Old();
-
-    inline VkFramebuffer GetHandle() const { return Framebuffer; }
-    inline uint32_t GetWidth() const { return Extents.width; }
-    inline uint32_t GetHeight() const { return Extents.height; }
-
-private:
-    VkFramebuffer Framebuffer;
-    VkExtent2D Extents;
-
-    AVulkanRenderPass* RenderPass;
     AVulkanDevice* Device;
 };
 

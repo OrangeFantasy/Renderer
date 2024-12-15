@@ -15,6 +15,7 @@ class AVulkanRenderPass;
 class AVulkanPipeline;
 class AVulkanCommandBufferManager;
 class AVulkanLayoutManager;
+class AVulkanPipelineStateManager;
 
 class AVulkanRHI
 {
@@ -43,7 +44,7 @@ public:
     // FVulkanTextureViewRef CreateTextureView(VkImage Image, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, VkFormat Format, uint32_t FirstMip,
     //     uint32_t NumMips, uint32_t ArraySliceIndex, uint32_t NumArraySlices);
 
-    AVulkanFramebuffer_Old* GetOrCreateSwapChainFrameBuffer(AVulkanRenderPass* RenderPass, int32_t Index);
+    //AVulkanFramebuffer_Old* GetOrCreateSwapChainFrameBuffer(AVulkanRenderPass* RenderPass, int32_t Index);
 
     VkInstance GetInstance() const { return Instance; }
     AVulkanDevice* GetDevice() const { return Device; }
@@ -70,6 +71,7 @@ private:
     // CVulkanRenderPass* RenderPass;
 
     AVulkanCommandBufferManager* CommandBufferManager;
+    AVulkanPipelineStateManager* PipelineStateManager;
     AVulkanLayoutManager* LayoutManager;
 
 #ifdef VK_VALIDATION_ENABLE
