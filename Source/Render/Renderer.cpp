@@ -1,6 +1,7 @@
 #include "Renderer.h"
 
 #include "RHI/VulkanRHI/VulkanRHI.h"
+#include "RHI/VulkanRHI/VulkanResources.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -12,23 +13,23 @@
 ARenderer::ARenderer(int32_t InWidth, int32_t InHeight) : WindowWidth(InWidth), WindowHeight(InHeight), RHI(nullptr)
 {
     InitializeWindow();
-   
+
     RHI = new AVulkanRHI();
+    RHI->InitizlizeViewport(GetNativeWindowHandle(), WindowWidth, WindowHeight, false);
+    // AViewportInfo ViewportInfo;
+    // AMemory::Memzero(ViewportInfo);
+    // ViewportInfo.WindowHandle = GetNativeWindowHandle();
+    // ViewportInfo.Width = WindowWidth;
+    // ViewportInfo.Height = WindowHeight;
+    // ViewportInfo.bIsFullscreen = false;
 
-    AViewportInfo ViewportInfo;
-    AMemory::Memzero(ViewportInfo);
-    ViewportInfo.WindowHandle = GetNativeWindowHandle();
-    ViewportInfo.Width = WindowWidth;
-    ViewportInfo.Height = WindowHeight;
-    ViewportInfo.bIsFullscreen = false;
-
-    RHI->InitizlizeContext(ViewportInfo);
+    // RHI->InitizlizeContext(ViewportInfo);
     // RHI->InitizlizeContext(ViewportInfo);
 }
 
 ARenderer::~ARenderer()
 {
-    RHI->ClearContext();
+    // RHI->ClearContext();
 
     delete RHI;
     RHI = nullptr;
@@ -59,13 +60,30 @@ void* ARenderer::GetNativeWindowHandle() const
 
 void ARenderer::MainTick()
 {
+    // AVulkanTexture* BackBuffer = RHI->GetViewportBackBuffer();
+
+    AVulkanRenderTargetsInfo RTInfo;
+    RTInfo.NumColorRenderTargets = 1;
+
+    AVulkanRenderTargetView& ColorRTView = RTInfo.ColorRenderTarget[0];
+    ColorRTView.Texture = RHI->GetViewportBackBuffer();
+    ColorRTView.LoadAction = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    ColorRTView.StoreAction = VK_ATTACHMENT_STORE_OP_STORE;
+
+    AVulkanRenderTargetLayout RTLayout(RTInfo);
+
+    AVulkanGfxPipelineState* PSO = RHI->CreateGfxPipelineState(RTLayout);
+
     while (!ShouldCloseWindow())
     {
         glfwPollEvents();
-        
+
         RHI->BeginDrawing();
         RHI->BeginRenderPass();
+
+        RHI->SetGraphicsPipelineState(PSO);
         RHI->DrawPrimitive(0, 1);
+
         RHI->EndRenderPass();
         RHI->EndDrawing();
     }
@@ -73,32 +91,30 @@ void ARenderer::MainTick()
     RHI->WaitIdle();
 }
 
-
-
-//bool FRenderer::InitializeRHI()
+// bool FRenderer::InitializeRHI()
 //{
-//    uint32_t GLFW_ExtensionCount = 0;
-//    const char** GLFW_ExtensionNames;
-//    GLFW_ExtensionNames = glfwGetRequiredInstanceExtensions(&GLFW_ExtensionCount);
+//     uint32_t GLFW_ExtensionCount = 0;
+//     const char** GLFW_ExtensionNames;
+//     GLFW_ExtensionNames = glfwGetRequiredInstanceExtensions(&GLFW_ExtensionCount);
 //
-//    RHI = new FVulkanRHI(glfwGetWin32Window(Window),
-//        // #else
-//        // VulkanRHI = new FVulkanRHI(GLFW_ExtensionCount, GLFW_ExtensionNames,
-//        // #endif // _DEBUG
-//        [&](VkInstance Instance)
-//        {
-//            VkSurfaceKHR Surface;
-//            glfwCreateWindowSurface(Instance, Window, nullptr, &Surface);
-//            return Surface;
-//        });
+//     RHI = new FVulkanRHI(glfwGetWin32Window(Window),
+//         // #else
+//         // VulkanRHI = new FVulkanRHI(GLFW_ExtensionCount, GLFW_ExtensionNames,
+//         // #endif // _DEBUG
+//         [&](VkInstance Instance)
+//         {
+//             VkSurfaceKHR Surface;
+//             glfwCreateWindowSurface(Instance, Window, nullptr, &Surface);
+//             return Surface;
+//         });
 //
-//    // TODO: Create Viewport;
-//    // VulkanRHI->GetOrCreateViewport();
+//     // TODO: Create Viewport;
+//     // VulkanRHI->GetOrCreateViewport();
 //
-//    return RHI->IsSuccessInitialize();
-//}
+//     return RHI->IsSuccessInitialize();
+// }
 
-//void FRenderer::MainTick()
+// void FRenderer::MainTick()
 //{
 //
-//}
+// }

@@ -71,6 +71,12 @@ AVulkanRHI::~AVulkanRHI()
     delete CommandBufferManager;
     CommandBufferManager = nullptr;
 
+    if (Viewport)
+    {
+        delete Viewport;
+        Viewport = nullptr;
+    }
+
     delete Device;
     Device = nullptr;
 
@@ -96,7 +102,7 @@ void AVulkanRHI::Initizlize()
     SelectAndInitizlizeDevice();
 
     CommandBufferManager = new AVulkanCommandBufferManager(Device);
-    PipelineStateManager = new AVulkanPipelineStateManager(Device);
+    PipelineStateManager = new AVulkanPipelineStateObjectManager(Device);
     LayoutManager = new AVulkanLayoutManager();
     Pipeline = nullptr;
 }
@@ -265,54 +271,30 @@ bool AVulkanRHI::SetupDebugMessenger()
 }
 #endif // VULKAN_VALIDATION_ENABLE
 
-void AVulkanRHI::InitizlizeContext(const AViewportInfo& ViewportInfo)
+void AVulkanRHI::InitizlizeViewport(void* WindowHandle, uint32_t SizeX, uint32_t SizeY, bool bIsFullscreen)
 {
-    Viewport = new AVulkanViewport(this, Device, ViewportInfo.WindowHandle, ViewportInfo.Width, ViewportInfo.Height, ViewportInfo.bIsFullscreen);
-    // Framebuffers.Resize(Viewport->NUM_BUFFERS, nullptr);
-
-    for (int32_t Index = 0; Index < Viewport->NUM_BUFFERS; ++Index)
-    {
-        // AVulkanTexture2D* ColorTexture = new AVulkanTexture2D(
-        //     Device, Viewport->GetSwapchainImageFormat(), Viewport->SizeX, Viewport->SizeY, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT,
-        //     Viewport->BackBufferImages[Index]);
-        // ColorTextures.Add(ColorTexture);
-
-        // AVulkanRenderTargetsInfo RTInfo;
-        // RTInfo.NumColorRenderTargets = 1;
-
-        // AVulkanRenderTargetView& ColorRTView = RTInfo.ColorRenderTarget[0];
-        // ColorRTView.Texture = ColorTexture;
-        // ColorRTView.LoadAction = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        // ColorRTView.StoreAction = VK_ATTACHMENT_STORE_OP_STORE;
-
-        // AVulkanRenderTargetLayout RTLayout(RTInfo);
-
-        // AVulkanRenderPass* Pass = new AVulkanRenderPass(Device, RTLayout);
-        // RenderPasses.Add(Pass);
-
-        // AVulkanPipeline* Pipeline = new AVulkanPipeline(Device, Pass);
-        // Pipelines.Add(Pipeline);
-    }
-
-    // RenderPass = new CVulkanRenderPass(Device);
-    // Pipeline = new AVulkanPipeline(Device, RenderPass);
+    Viewport = new AVulkanViewport(this, Device, WindowHandle, SizeX, SizeY, bIsFullscreen);
 }
 
-void AVulkanRHI::ClearContext()
+AVulkanTexture2D* AVulkanRHI::GetViewportBackBuffer()
 {
-    // for (auto RenderPass : RenderPasses)
-    //{
-    //     delete RenderPass;
-    //     RenderPass = nullptr;
-    // }
-    // for (auto Pipeline : Pipelines)
-    //{
-    //     delete Pipeline;
-    //     Pipeline = nullptr;
-    // }
+    return Viewport->GetBackBuffer();
+}
 
-    delete Viewport;
-    Viewport = nullptr;
+AVulkanGfxPipelineState* AVulkanRHI::CreateGfxPipelineState(const AVulkanRenderTargetLayout& RTLayout)
+{
+    AVulkanRenderPass* RenderPass = LayoutManager->GetOrCreateRenderPass(Device, RTLayout);
+    return PipelineStateManager->CreateGfxPipelineState(RenderPass);
+}
+
+void AVulkanRHI::SetViewport(float MinX, float MinY, float MinZ, float MaxX, float MaxY, float MaxZ) {}
+
+void AVulkanRHI::SetScissorRect(bool bEnable, uint32_t MinX, uint32_t MinY, uint32_t MaxX, uint32_t MaxY) {}
+
+void AVulkanRHI::SetGraphicsPipelineState(AVulkanGfxPipelineState* PSO)
+{
+    AVulkanCmdBuffer* CmdBuffer = CommandBufferManager->GetActiveCmdBuffer();
+    PSO->Bind(CmdBuffer->GetHandle());
 }
 
 void AVulkanRHI::BeginDrawing()
@@ -373,11 +355,11 @@ void AVulkanRHI::DrawPrimitive(uint32_t FirstVertexIndex, uint32_t NumPrimitives
     AVulkanCmdBuffer* CmdBuffer = CommandBufferManager->GetActiveCmdBuffer();
 
     // TODO: vkCmdBindPipeline
-    if (!Pipeline)
-    {
-        Pipeline = new AVulkanPipeline(Device, LayoutManager->CurrentRenderPass);
-    }
-    VulkanApi::vkCmdBindPipeline(CmdBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline->GetHandle());
+    // if (!Pipeline)
+    //{
+    //    Pipeline = new AVulkanPipeline(Device, LayoutManager->CurrentRenderPass);
+    //}
+    // VulkanApi::vkCmdBindPipeline(CmdBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline->GetHandle());
     // VulkanApi::vkCmdBindPipeline(CmdBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, Pipelines[Viewport->AcquiredImageIndex]->GetHandle());
 
     uint32_t NumVertices = NumPrimitives * 3;
@@ -388,43 +370,3 @@ void AVulkanRHI::WaitIdle()
 {
     VK_CHECK_RESULT(VulkanApi::vkDeviceWaitIdle(Device->GetHandle()));
 }
-
-// AVulkanFramebuffer_Old* AVulkanRHI::GetOrCreateSwapChainFrameBuffer(AVulkanRenderPass* RenderPass, int32_t Index)
-//  {
-//     AVulkanFramebuffer_Old* Framebuffer = Framebuffers[Index];
-//     if (Framebuffer == nullptr)
-//     {
-//         VkExtent2D Extents;
-//         AMemory::Memzero(Extents);
-//         Extents.width = Viewport->SizeX;
-//         Extents.height = Viewport->SizeY;
-//
-//         Framebuffer = new AVulkanFramebuffer_Old(Device, RenderPass, Viewport->TextureViews[Index]->View, Extents);
-//         Framebuffers[Index] = Framebuffer;
-//     }
-//
-//     return Framebuffer;
-// }
-
-// FVulkanTexture2DRef FVulkanRHI::CreateTexture2D(VkFormat Format, uint32_t NumMips, uint32_t NumSamples, VkImageTiling Tiling, VkImageUsageFlags UsageFlags)
-//{
-//     return new FVulkanTexture2D(Device, Viewport->SizeX, Viewport->SizeY, Format, NumMips, NumSamples, Tiling, UsageFlags);
-// }
-//
-// FVulkanTexture2DRef FVulkanRHI::CreateTexture2D(
-//     uint32_t Width, uint32_t Height, VkFormat Format, uint32_t NumMips, uint32_t NumSamples, VkImageTiling Tiling, VkImageUsageFlags UsageFlags)
-//{
-//     return new FVulkanTexture2D(Device, Width, Height, Format, NumMips, NumSamples, Tiling, UsageFlags);
-// }
-//
-// FVulkanTextureViewRef FVulkanRHI::CreateTextureView(VkImage Image, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, VkFormat Format)
-//{
-//     return new FVulkanTextureView(Device, Image, ViewType, AspectFlags, Format, 0, 1, 0, 1);
-// }
-//
-// FVulkanTextureViewRef FVulkanRHI::CreateTextureView(VkImage Image, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, VkFormat Format, uint32_t
-// FirstMip,
-//     uint32_t NumMips, uint32_t ArraySliceIndex, uint32_t NumArraySlices)
-//{
-//     return new FVulkanTextureView(Device, Image, ViewType, AspectFlags, Format, FirstMip, NumMips, ArraySliceIndex, NumArraySlices);
-// }

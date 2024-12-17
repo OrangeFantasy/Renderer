@@ -193,10 +193,10 @@ VkShaderModule AVulkanShaderManager::CreateShaderModule(AVulkanDevice* Device, c
 VkShaderModule AVulkanShaderManager::GetOrCreateHandle(const AnsiChar* Spirv)
 {
     uint64_t SpirvHash = static_cast<uint64_t>(std::hash<const AnsiChar*>()(Spirv));
-    VkShaderModule* Found = ShaderModules.Find(SpirvHash);
-    if (Found)
+    VkShaderModule* FoundShaderModule = ShaderModules.Find(SpirvHash);
+    if (FoundShaderModule)
     {
-        return *Found;
+        return *FoundShaderModule;
     }
 
     VkShaderModule ShaderModule = CreateShaderModule(Device, ReadSpirv(Spirv));
@@ -207,8 +207,8 @@ VkShaderModule AVulkanShaderManager::GetOrCreateHandle(const AnsiChar* Spirv)
 AVulkanGfxPipelineState::AVulkanGfxPipelineState(AVulkanDevice* InDevice, const AVulkanGfxPipelineDesc& InDesc)
     : Device(InDevice), Desc(InDesc), Pipeline(VK_NULL_HANDLE), Layout(VK_NULL_HANDLE), RenderPass(nullptr)
 {
-    ShaderModules[ShaderStage::Vertex] = nullptr;
-    ShaderModules[ShaderStage::Pixel] = nullptr;
+    ShaderModules[ShaderStage::Vertex] = VK_NULL_HANDLE;
+    ShaderModules[ShaderStage::Pixel] = VK_NULL_HANDLE;
 }
 
 AVulkanGfxPipelineState::~AVulkanGfxPipelineState()
@@ -232,9 +232,47 @@ void AVulkanGfxPipelineState::FindOrCreateShaderModules()
     }
 }
 
-AVulkanPipelineStateManager::AVulkanPipelineStateManager(AVulkanDevice* InDevice) : Device(InDevice) {}
+AVulkanPipelineStateObjectManager::AVulkanPipelineStateObjectManager(AVulkanDevice* InDevice) : Device(InDevice) {}
 
-bool AVulkanPipelineStateManager::CreateGfxPipeline(AVulkanGfxPipelineState* PSO)
+AVulkanPipelineStateObjectManager::~AVulkanPipelineStateObjectManager()
+{
+    for (auto& [Hash, PSO] : GfxPSOMap)
+    {
+        delete PSO;
+        PSO = nullptr;
+    }
+}
+
+AVulkanGfxPipelineState* AVulkanPipelineStateObjectManager::CreateGfxPipelineState(AVulkanRenderPass* RenderPass)
+{
+    if (AVulkanGfxPipelineState** FoundPSO = GfxPSOMap.Find(0))
+    {
+        return *FoundPSO;
+    }
+
+    AVulkanGfxPipelineDesc Desc;
+    AMemory::Memzero(Desc);
+    Desc.Topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    Desc.SubpassIndex = 0;
+    Desc.Spirvs[ShaderStage::Vertex] = "E:/_Project/Git_Project/Renderer/Shaders/Compiled/VertShaderBase_vert.spv";
+    Desc.Spirvs[ShaderStage::Pixel] = "E:/_Project/Git_Project/Renderer/Shaders/Compiled/FragShaderBase_frag.spv";
+
+    AVulkanGfxPipelineState* PSO = new AVulkanGfxPipelineState(Device, Desc);
+    PSO->RenderPass = RenderPass;
+
+    VkPipelineLayoutCreateInfo PipelineLayoutInfo = {};
+    ZeroVulkanStruct(PipelineLayoutInfo, VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO);
+    PipelineLayoutInfo.setLayoutCount = 0;
+    PipelineLayoutInfo.pushConstantRangeCount = 0;
+    VK_CHECK_RESULT(VulkanApi::vkCreatePipelineLayout(Device->GetHandle(), &PipelineLayoutInfo, VK_CPU_ALLOCATOR, &PSO->Layout));
+
+    CreateGfxPipeline(PSO);
+    GfxPSOMap.Add(0, PSO);
+
+    return PSO;
+}
+
+bool AVulkanPipelineStateObjectManager::CreateGfxPipeline(AVulkanGfxPipelineState* PSO)
 {
     const AVulkanGfxPipelineDesc& GfxDesc = PSO->Desc;
 
@@ -258,7 +296,7 @@ bool AVulkanPipelineStateManager::CreateGfxPipeline(AVulkanGfxPipelineState* PSO
     //    }
     //    ColorWriteMask >>= 1;
     // }
-
+    //
     // VkPipelineColorBlendStateCreateInfo ColorBlendingInfo;
     // ZeroVulkanStruct(ColorBlendingInfo, VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO);
     // ColorBlendingInfo.attachmentCount = GfxDesc.ColorAttachmentStates.Num();

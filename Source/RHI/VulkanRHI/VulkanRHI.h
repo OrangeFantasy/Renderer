@@ -13,9 +13,10 @@ class AVulkanDevice;
 class AVulkanViewport;
 class AVulkanRenderPass;
 class AVulkanPipeline;
+class AVulkanGfxPipelineState;
 class AVulkanCommandBufferManager;
 class AVulkanLayoutManager;
-class AVulkanPipelineStateManager;
+class AVulkanPipelineStateObjectManager;
 
 class AVulkanRHI
 {
@@ -24,13 +25,19 @@ public:
     ~AVulkanRHI();
 
     void Initizlize();
+    void InitizlizeViewport(void* WindowHandle, uint32_t SizeX, uint32_t SizeY, bool bIsFullscreen);
 
-    void InitizlizeContext(const AViewportInfo& ViewportInfo);
-    void ClearContext();
+    AVulkanTexture2D* GetViewportBackBuffer();
+
+    AVulkanGfxPipelineState* CreateGfxPipelineState(const AVulkanRenderTargetLayout& RTLayout /* GfxPSO Struct */);
+
+    void SetViewport(float MinX, float MinY, float MinZ, float MaxX, float MaxY, float MaxZ);
+    void SetScissorRect(bool bEnable, uint32_t MinX, uint32_t MinY, uint32_t MaxX, uint32_t MaxY);
+    void SetGraphicsPipelineState(AVulkanGfxPipelineState* PSO);
 
     void BeginDrawing();
     void EndDrawing();
-    void BeginRenderPass();
+    void BeginRenderPass(/* TODO: Render Pass Struct. */);
     void EndRenderPass();
 
     void DrawPrimitive(uint32_t FirstVertexIndex, uint32_t NumPrimitives);
@@ -44,7 +51,7 @@ public:
     // FVulkanTextureViewRef CreateTextureView(VkImage Image, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, VkFormat Format, uint32_t FirstMip,
     //     uint32_t NumMips, uint32_t ArraySliceIndex, uint32_t NumArraySlices);
 
-    //AVulkanFramebuffer_Old* GetOrCreateSwapChainFrameBuffer(AVulkanRenderPass* RenderPass, int32_t Index);
+    // AVulkanFramebuffer_Old* GetOrCreateSwapChainFrameBuffer(AVulkanRenderPass* RenderPass, int32_t Index);
 
     VkInstance GetInstance() const { return Instance; }
     AVulkanDevice* GetDevice() const { return Device; }
@@ -71,7 +78,7 @@ private:
     // CVulkanRenderPass* RenderPass;
 
     AVulkanCommandBufferManager* CommandBufferManager;
-    AVulkanPipelineStateManager* PipelineStateManager;
+    AVulkanPipelineStateObjectManager* PipelineStateManager;
     AVulkanLayoutManager* LayoutManager;
 
 #ifdef VK_VALIDATION_ENABLE

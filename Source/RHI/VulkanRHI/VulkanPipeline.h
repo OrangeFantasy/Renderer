@@ -7,7 +7,7 @@ class AVulkanRHI;
 class AVulkanDevice;
 class AVulkanShader;
 class AVulkanRenderPass;
-class AVulkanPipelineStateManager;
+class AVulkanPipelineStateObjectManager;
 
 class AVulkanPipeline
 {
@@ -78,12 +78,14 @@ struct AVulkanGfxPipelineDesc
 
 class AVulkanGfxPipelineState
 {
+public:
     AVulkanGfxPipelineState(AVulkanDevice* Device, const AVulkanGfxPipelineDesc& Desc);
     ~AVulkanGfxPipelineState();
 
-    void FindOrCreateShaderModules();
-
     inline void Bind(VkCommandBuffer CmdBuffer) { VulkanApi::vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline); }
+
+private:
+    void FindOrCreateShaderModules();
 
 private:
     AVulkanGfxPipelineDesc Desc;
@@ -95,16 +97,22 @@ private:
     AVulkanRenderPass* RenderPass;
     AVulkanDevice* Device;
 
-    friend AVulkanPipelineStateManager;
+    friend AVulkanPipelineStateObjectManager;
 };
 
-class AVulkanPipelineStateManager
+class AVulkanPipelineStateObjectManager
 {
 public:
-    AVulkanPipelineStateManager(AVulkanDevice* Device);
+    AVulkanPipelineStateObjectManager(AVulkanDevice* Device);
+    ~AVulkanPipelineStateObjectManager();
 
+    AVulkanGfxPipelineState* CreateGfxPipelineState(AVulkanRenderPass* RenderPass);
+
+private:
     bool CreateGfxPipeline(AVulkanGfxPipelineState* PSO);
 
 private:
+    TMap<int64_t, AVulkanGfxPipelineState*> GfxPSOMap;
+
     AVulkanDevice* Device;
 };
