@@ -2,6 +2,7 @@
 
 #include "RHI/VulkanRHI/VulkanRHI.h"
 #include "RHI/VulkanRHI/VulkanResources.h"
+#include "RHI/VulkanRHI/VulkanPipeline.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>

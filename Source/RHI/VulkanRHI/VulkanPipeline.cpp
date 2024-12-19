@@ -232,9 +232,9 @@ void AVulkanGfxPipelineState::FindOrCreateShaderModules()
     }
 }
 
-AVulkanPipelineStateObjectManager::AVulkanPipelineStateObjectManager(AVulkanDevice* InDevice) : Device(InDevice) {}
+AVulkanPipelineStateManager::AVulkanPipelineStateManager(AVulkanDevice* InDevice) : Device(InDevice) {}
 
-AVulkanPipelineStateObjectManager::~AVulkanPipelineStateObjectManager()
+AVulkanPipelineStateManager::~AVulkanPipelineStateManager()
 {
     for (auto& [Hash, PSO] : GfxPSOMap)
     {
@@ -243,7 +243,7 @@ AVulkanPipelineStateObjectManager::~AVulkanPipelineStateObjectManager()
     }
 }
 
-AVulkanGfxPipelineState* AVulkanPipelineStateObjectManager::CreateGfxPipelineState(AVulkanRenderPass* RenderPass)
+AVulkanGfxPipelineState* AVulkanPipelineStateManager::CreateGfxPipelineState(AVulkanRenderPass* RenderPass)
 {
     if (AVulkanGfxPipelineState** FoundPSO = GfxPSOMap.Find(0))
     {
@@ -272,7 +272,7 @@ AVulkanGfxPipelineState* AVulkanPipelineStateObjectManager::CreateGfxPipelineSta
     return PSO;
 }
 
-bool AVulkanPipelineStateObjectManager::CreateGfxPipeline(AVulkanGfxPipelineState* PSO)
+bool AVulkanPipelineStateManager::CreateGfxPipeline(AVulkanGfxPipelineState* PSO)
 {
     const AVulkanGfxPipelineDesc& GfxDesc = PSO->Desc;
 

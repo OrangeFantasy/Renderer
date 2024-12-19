@@ -6,17 +6,16 @@
 #include "VulkanDebug.h"
 #endif // VULKAN_VALIDATION_ENABLE
 
-#include "VulkanResources.h"
-#include "VulkanViewport.h"
-
 class AVulkanDevice;
 class AVulkanViewport;
+class AVulkanRenderTargetLayout;
 class AVulkanRenderPass;
 class AVulkanPipeline;
 class AVulkanGfxPipelineState;
 class AVulkanCommandBufferManager;
+class AVulkanPipelineStateManager;
 class AVulkanLayoutManager;
-class AVulkanPipelineStateObjectManager;
+struct AVulkanTexture2D;
 
 class AVulkanRHI
 {
@@ -78,7 +77,7 @@ private:
     // CVulkanRenderPass* RenderPass;
 
     AVulkanCommandBufferManager* CommandBufferManager;
-    AVulkanPipelineStateObjectManager* PipelineStateManager;
+    AVulkanPipelineStateManager* PipelineStateManager;
     AVulkanLayoutManager* LayoutManager;
 
 #ifdef VK_VALIDATION_ENABLE

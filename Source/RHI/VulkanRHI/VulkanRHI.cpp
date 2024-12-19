@@ -1,4 +1,5 @@
 #include "VulkanRHI.h"
+
 #include "VulkanDevice.h"
 #include "VulkanPlatform.h"
 #include "VulkanViewport.h"
@@ -102,7 +103,7 @@ void AVulkanRHI::Initizlize()
     SelectAndInitizlizeDevice();
 
     CommandBufferManager = new AVulkanCommandBufferManager(Device);
-    PipelineStateManager = new AVulkanPipelineStateObjectManager(Device);
+    PipelineStateManager = new AVulkanPipelineStateManager(Device);
     LayoutManager = new AVulkanLayoutManager();
     Pipeline = nullptr;
 }

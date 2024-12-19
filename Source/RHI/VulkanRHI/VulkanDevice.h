@@ -6,7 +6,7 @@ class AVulkanRHI;
 class AVulkanQueue;
 class AVulkanFenceManager;
 class AVulkanShaderManager;
-class AVulkanPipelineStateObjectManager;
+class AVulkanPipelineStateManager;
 
 class AVulkanDevice
 {

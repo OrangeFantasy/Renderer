@@ -7,12 +7,12 @@ class AVulkanRHI;
 class AVulkanDevice;
 class AVulkanShader;
 class AVulkanRenderPass;
-class AVulkanPipelineStateObjectManager;
+class AVulkanPipelineStateManager;
 
 class AVulkanPipeline
 {
 public:
-    AVulkanPipeline(AVulkanDevice* InDevice, AVulkanRenderPass* RenderPass);
+    AVulkanPipeline(AVulkanDevice* Device, AVulkanRenderPass* RenderPass);
     ~AVulkanPipeline();
 
     inline VkPipeline GetHandle() const { return Pipeline; }
@@ -97,14 +97,14 @@ private:
     AVulkanRenderPass* RenderPass;
     AVulkanDevice* Device;
 
-    friend AVulkanPipelineStateObjectManager;
+    friend AVulkanPipelineStateManager;
 };
 
-class AVulkanPipelineStateObjectManager
+class AVulkanPipelineStateManager
 {
 public:
-    AVulkanPipelineStateObjectManager(AVulkanDevice* Device);
-    ~AVulkanPipelineStateObjectManager();
+    AVulkanPipelineStateManager(AVulkanDevice* Device);
+    ~AVulkanPipelineStateManager();
 
     AVulkanGfxPipelineState* CreateGfxPipelineState(AVulkanRenderPass* RenderPass);
 
@@ -115,4 +115,20 @@ private:
     TMap<int64_t, AVulkanGfxPipelineState*> GfxPSOMap;
 
     AVulkanDevice* Device;
+};
+
+// TODO:
+class AVulkanRenderingState
+{
+public:
+    AVulkanRenderingState(AVulkanRHI* RHI, AVulkanDevice* Device);
+
+private:
+    VkViewport Viewport;
+    VkRect2D Scissor;
+
+    AVulkanGfxPipelineState* CurrentPipeline;
+
+    AVulkanDevice* Device;
+    AVulkanRHI* RHI;
 };
