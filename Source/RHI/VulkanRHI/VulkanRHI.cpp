@@ -44,26 +44,8 @@ AVulkanRHI::AVulkanRHI() : Instance(VK_NULL_HANDLE), Device(nullptr), Viewport(n
 
 AVulkanRHI::~AVulkanRHI()
 {
-    // for (AVulkanTexture2D* ColorTexture : ColorTextures)
-    //{
-    //     ColorTexture->Surface.Image = VK_NULL_HANDLE;
-    //     delete ColorTexture;
-    //     ColorTexture = nullptr;
-    // }
-
-    // for (CVulkanRenderPass* Pass : RenderPasses)
-    // {
-    //     delete Pass;
-    //     Pass = nullptr;
-    // }
-    //
-    // for (AVulkanFramebuffer_Old* Framebuffer : Framebuffers)
-    //  {
-    //     delete Framebuffer;
-    //     Framebuffer = nullptr;
-    // }
-    delete Pipeline;
-    Pipeline = nullptr;
+    delete RenderingState;
+    RenderingState = nullptr;
 
     delete PipelineStateManager;
     PipelineStateManager = nullptr;
@@ -94,7 +76,8 @@ void AVulkanRHI::Initizlize()
 {
     if (!AVulkanPlatform::LoadVulkanLibrary())
     {
-        std::cout << "Failed to find all required Vulkan entry points; make sure your driver supports Vulkan!\n";
+        std::cerr << "Failed to find all required Vulkan entry points; make sure your driver supports Vulkan!\n";
+        return;
     }
 
     CreateInstance();
@@ -105,7 +88,8 @@ void AVulkanRHI::Initizlize()
     CommandBufferManager = new AVulkanCommandBufferManager(Device);
     PipelineStateManager = new AVulkanPipelineStateManager(Device);
     LayoutManager = new AVulkanLayoutManager();
-    Pipeline = nullptr;
+
+    RenderingState = new AVulkanRenderingState(this, Device);
 }
 
 void AVulkanRHI::CreateInstance()
@@ -288,14 +272,24 @@ AVulkanGfxPipelineState* AVulkanRHI::CreateGfxPipelineState(const AVulkanRenderT
     return PipelineStateManager->CreateGfxPipelineState(RenderPass);
 }
 
-void AVulkanRHI::SetViewport(float MinX, float MinY, float MinZ, float MaxX, float MaxY, float MaxZ) {}
+void AVulkanRHI::SetViewport(float MinX, float MinY, float MinZ, float MaxX, float MaxY, float MaxZ)
+{
+    RenderingState->SetViewport(MinX, MinY, MinZ, MaxX, MaxY, MaxZ);
+}
 
-void AVulkanRHI::SetScissorRect(bool bEnable, uint32_t MinX, uint32_t MinY, uint32_t MaxX, uint32_t MaxY) {}
+void AVulkanRHI::SetScissorRect(bool bEnable, uint32_t MinX, uint32_t MinY, uint32_t MaxX, uint32_t MaxY)
+{
+    RenderingState->SetScissorRect(bEnable, MinX, MinY, MaxX, MaxY);
+}
 
 void AVulkanRHI::SetGraphicsPipelineState(AVulkanGfxPipelineState* PSO)
 {
     AVulkanCmdBuffer* CmdBuffer = CommandBufferManager->GetActiveCmdBuffer();
-    PSO->Bind(CmdBuffer->GetHandle());
+    if (RenderingState->SetGfxPipeline(PSO) || !CmdBuffer->bHasPipeline)
+    {
+        RenderingState->Bind(CmdBuffer);
+        CmdBuffer->bHasPipeline = true;
+    }
 }
 
 void AVulkanRHI::BeginDrawing()
@@ -308,7 +302,6 @@ void AVulkanRHI::BeginDrawing()
 void AVulkanRHI::EndDrawing()
 {
     AVulkanCmdBuffer* CmdBuffer = CommandBufferManager->GetActiveCmdBuffer();
-    /*   CmdBuffer->End();*/
 
     Viewport->Present(CmdBuffer, Device->GetGraphicsQueue(), Device->GetPresentQueue());
     Viewport->ClearBackBuffer();
@@ -354,17 +347,13 @@ void AVulkanRHI::EndRenderPass()
 void AVulkanRHI::DrawPrimitive(uint32_t FirstVertexIndex, uint32_t NumPrimitives)
 {
     AVulkanCmdBuffer* CmdBuffer = CommandBufferManager->GetActiveCmdBuffer();
-
-    // TODO: vkCmdBindPipeline
-    // if (!Pipeline)
-    //{
-    //    Pipeline = new AVulkanPipeline(Device, LayoutManager->CurrentRenderPass);
-    //}
-    // VulkanApi::vkCmdBindPipeline(CmdBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline->GetHandle());
-    // VulkanApi::vkCmdBindPipeline(CmdBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, Pipelines[Viewport->AcquiredImageIndex]->GetHandle());
+    RenderingState->PrepareForDraw(CmdBuffer);
 
     uint32_t NumVertices = NumPrimitives * 3;
     VulkanApi::vkCmdDraw(CmdBuffer->GetHandle(), NumVertices, 1, FirstVertexIndex, 0);
+
+    // DEBUG.
+    RenderingState->Reset();
 }
 
 void AVulkanRHI::WaitIdle()

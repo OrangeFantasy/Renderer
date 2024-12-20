@@ -80,12 +80,20 @@ void ARenderer::MainTick()
         glfwPollEvents();
 
         RHI->BeginDrawing();
-        RHI->BeginRenderPass();
 
+        RHI->SetViewport(0.0f, 0.0f, 0.0f, (float)WindowWidth, (float)WindowHeight, 1.0f);
+
+        RHI->BeginRenderPass();
+        // RHI->SetViewport
         RHI->SetGraphicsPipelineState(PSO);
         RHI->DrawPrimitive(0, 1);
-
         RHI->EndRenderPass();
+
+        // RHI->BeginRenderPass();
+        // RHI->SetGraphicsPipelineState(PSO);
+        // RHI->DrawPrimitive(0, 1);
+        // RHI->EndRenderPass();
+
         RHI->EndDrawing();
     }
 

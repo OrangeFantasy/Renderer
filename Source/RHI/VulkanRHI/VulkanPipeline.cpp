@@ -1,5 +1,7 @@
 #include "VulkanPipeline.h"
+
 #include "VulkanDevice.h"
+#include "VulkanCommandBuffer.h"
 #include "VulkanResources.h"
 
 #define SHADER_PATH(NAME) ((std::string(SHADER_DIR) + std::string(NAME)).data())
@@ -232,6 +234,11 @@ void AVulkanGfxPipelineState::FindOrCreateShaderModules()
     }
 }
 
+void AVulkanGfxPipelineState::Bind(AVulkanCmdBuffer* CmdBuffer)
+{
+    VulkanApi::vkCmdBindPipeline(CmdBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
+}
+
 AVulkanPipelineStateManager::AVulkanPipelineStateManager(AVulkanDevice* InDevice) : Device(InDevice) {}
 
 AVulkanPipelineStateManager::~AVulkanPipelineStateManager()
@@ -433,4 +440,96 @@ bool AVulkanPipelineStateManager::CreateGfxPipeline(AVulkanGfxPipelineState* PSO
     }
 
     return true;
+}
+
+AVulkanRenderingState::AVulkanRenderingState(AVulkanRHI* InRHI, AVulkanDevice* InDevice) : RHI(InRHI), Device(InDevice)
+{
+    Reset();
+}
+
+void AVulkanRenderingState::Reset()
+{
+    AMemory::Memzero(Viewport);
+    AMemory::Memzero(Scissor);
+
+    CurrentPSO = nullptr;
+}
+
+void AVulkanRenderingState::SetViewport(float MinX, float MinY, float MinZ, float MaxX, float MaxY, float MaxZ)
+{
+    AMemory::Memzero(Viewport);
+
+    Viewport.x = MinX;
+    Viewport.y = MinY;
+    Viewport.width = MaxX - MinX;
+    Viewport.height = MaxY - MinY;
+    Viewport.minDepth = MinZ;
+    Viewport.maxDepth = MinZ == MaxZ ? MinZ + 1.0f : MaxZ;
+
+    SetScissorRect((uint32_t)MinX, (uint32_t)MinY, (uint32_t)(MaxX - MinX), (uint32_t)(MaxY - MinY));
+}
+
+void AVulkanRenderingState::SetScissorRect(bool bEnable, uint32_t MinX, uint32_t MinY, uint32_t MaxX, uint32_t MaxY)
+{
+    if (bEnable)
+    {
+        SetScissorRect(MinX, MinY, MaxX - MinX, MaxY - MinY);
+    }
+    else
+    {
+        SetScissorRect((uint32_t)Viewport.x, (uint32_t)Viewport.y, (uint32_t)Viewport.width, (uint32_t)Viewport.height);
+    }
+}
+
+void AVulkanRenderingState::SetScissorRect(uint32_t MinX, uint32_t MinY, uint32_t Width, uint32_t Height)
+{
+    AMemory::Memzero(Scissor);
+
+    Scissor.offset.x = MinX;
+    Scissor.offset.y = MinY;
+    Scissor.extent.width = Width;
+    Scissor.extent.height = Height;
+}
+
+bool AVulkanRenderingState::SetGfxPipeline(AVulkanGfxPipelineState* PSO)
+{
+    if (CurrentPSO != PSO)
+    {
+        CurrentPSO = PSO;
+        return true;
+    }
+    return false;
+}
+
+void AVulkanRenderingState::UpdateDynamicStates(AVulkanCmdBuffer* CmdBuffer)
+{
+    if (!CmdBuffer->bHasViewport || (AMemory::Memcmp((const void*)&CmdBuffer->CurrentViewport, (const void*)&Viewport, sizeof(VkViewport)) != 0))
+    {
+        check(Viewport.width > 0 || Viewport.height > 0);
+
+        // Flip viewport on Y-axis to be uniform between HLSLcc and DXC generated SPIR-V shaders (requires VK_KHR_maintenance1 extension)
+        // VkViewport FlippedViewport = Viewport;
+        // FlippedViewport.y += FlippedViewport.height;
+        // FlippedViewport.height = -FlippedViewport.height;
+        // VulkanApi::vkCmdSetViewport(CmdBuffer->GetHandle(), 0, 1, &FlippedViewport);
+        VulkanApi::vkCmdSetViewport(CmdBuffer->GetHandle(), 0, 1, &Viewport);
+
+        AMemory::Memcpy(CmdBuffer->CurrentViewport, Viewport);
+        CmdBuffer->bHasViewport = true;
+    }
+
+    if (!CmdBuffer->bHasScissor || (AMemory::Memcmp((const void*)&CmdBuffer->CurrentScissor, (const void*)&Scissor, sizeof(VkRect2D)) != 0))
+    {
+        VulkanApi::vkCmdSetScissor(CmdBuffer->GetHandle(), 0, 1, &Scissor);
+
+        AMemory::Memcpy(CmdBuffer->CurrentScissor, Scissor);
+        CmdBuffer->bHasScissor = true;
+    }
+}
+
+void AVulkanRenderingState::PrepareForDraw(AVulkanCmdBuffer* CmdBuffer)
+{
+    check(CmdBuffer->bHasPipeline);
+
+    UpdateDynamicStates(CmdBuffer);
 }

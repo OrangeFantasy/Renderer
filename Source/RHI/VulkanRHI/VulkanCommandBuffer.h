@@ -54,6 +54,9 @@ public:
     VkViewport CurrentViewport;
     VkRect2D CurrentScissor;
     bool bIsUploadOnly;
+    bool bHasPipeline;
+    bool bHasViewport;
+    bool bHasScissor;
 
 private:
     void AllocMemory();

@@ -82,7 +82,7 @@ public:
     AVulkanGfxPipelineState(AVulkanDevice* Device, const AVulkanGfxPipelineDesc& Desc);
     ~AVulkanGfxPipelineState();
 
-    inline void Bind(VkCommandBuffer CmdBuffer) { VulkanApi::vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline); }
+    void Bind(AVulkanCmdBuffer* CmdBuffer);
 
 private:
     void FindOrCreateShaderModules();
@@ -123,11 +123,26 @@ class AVulkanRenderingState
 public:
     AVulkanRenderingState(AVulkanRHI* RHI, AVulkanDevice* Device);
 
+    void Reset();
+
+    void SetViewport(float MinX, float MinY, float MinZ, float MaxX, float MaxY, float MaxZ);
+    void SetScissorRect(bool bEnable, uint32_t MinX, uint32_t MinY, uint32_t MaxX, uint32_t MaxY);
+
+    bool SetGfxPipeline(AVulkanGfxPipelineState* PSO);
+
+    void Bind(AVulkanCmdBuffer* CmdBuffer) { CurrentPSO->Bind(CmdBuffer); }
+    void PrepareForDraw(AVulkanCmdBuffer* CmdBuffer);
+
+private:
+    void SetScissorRect(uint32_t MinX, uint32_t MinY, uint32_t Width, uint32_t Height);
+
+    void UpdateDynamicStates(AVulkanCmdBuffer* CmdBuffer);
+
 private:
     VkViewport Viewport;
     VkRect2D Scissor;
 
-    AVulkanGfxPipelineState* CurrentPipeline;
+    AVulkanGfxPipelineState* CurrentPSO;
 
     AVulkanDevice* Device;
     AVulkanRHI* RHI;

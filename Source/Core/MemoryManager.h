@@ -1,6 +1,7 @@
 #pragma once
 
 #include <type_traits>
+#include <cstring>
 
 struct AMemory
 {
@@ -14,6 +15,22 @@ struct AMemory
     static inline void Memzero(T* Ptr, size_t Size)
     {
         std::memset(Ptr, 0, Size);
+    }
+
+    template <typename T, typename = typename std::enable_if<!std::is_pointer<T>::value>>
+    static inline void Memcpy(T& Dest, const T& Src)
+    {
+        std::memcpy(&Dest, &Src, sizeof(T));
+    }
+
+    static inline void* Memcpy(void* Dest, const void* Src, size_t Count) 
+    {
+        return std::memcpy(Dest, Src, Count);
+    }
+
+    static inline int32_t Memcmp(const void* Buf1, const void* Buf2, size_t Size)
+    { 
+        return static_cast<int32_t>(std::memcmp(Buf1, Buf2, Size));
     }
 };
 

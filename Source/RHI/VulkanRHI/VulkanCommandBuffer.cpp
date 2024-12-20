@@ -11,7 +11,8 @@
 ////////////////////////////////////////
 
 AVulkanCmdBuffer::AVulkanCmdBuffer(AVulkanDevice* InDevice, AVulkanCommandBufferPool* InCommandBufferPool, bool bInIsUploadOnly)
-    : Device(InDevice), CommandBufferPool(InCommandBufferPool), Handle(VK_NULL_HANDLE), bIsUploadOnly(bInIsUploadOnly), State(EState::NotAllocated), Fence(nullptr)
+    : Device(InDevice), CommandBufferPool(InCommandBufferPool), Handle(VK_NULL_HANDLE), bIsUploadOnly(bInIsUploadOnly), bHasPipeline(false),
+      bHasViewport(false), bHasScissor(false), State(EState::NotAllocated), Fence(nullptr)
 {
     AllocMemory();
 
