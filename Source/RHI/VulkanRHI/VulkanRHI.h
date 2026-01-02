@@ -3,20 +3,22 @@
 #include "VulkanApi.h"
 
 #if VK_VALIDATION_ENABLE
-#include "VulkanDebug.h"
+#include "VulkanValidation.h"
 #endif // VULKAN_VALIDATION_ENABLE
 
+class AVulkanCommandBuffer;
+class AVulkanCommandBufferPool;
 class AVulkanDevice;
-class AVulkanViewport;
-class AVulkanRenderTargetLayout;
-class AVulkanRenderPass;
+class AVulkanFence;
+class AVulkanGraphicsPipelineState;
 class AVulkanPipeline;
-class AVulkanGfxPipelineState;
-class AVulkanCommandBufferManager;
 class AVulkanPipelineStateManager;
-class AVulkanLayoutManager;
-class AVulkanRenderingState;
-struct AVulkanTexture2D;
+class AVulkanRenderPass;
+class AVulkanRenderPassManager;
+class AVulkanRenderTargetLayout;
+class AVulkanViewport;
+
+struct AVulkanTexture;
 
 class AVulkanRHI
 {
@@ -24,16 +26,23 @@ public:
     AVulkanRHI();
     ~AVulkanRHI();
 
-    void Initizlize();
-    void InitizlizeViewport(void* WindowHandle, uint32_t SizeX, uint32_t SizeY, bool bIsFullscreen);
+    VkInstance GetInstance() const { return Instance; }
+    AVulkanDevice* GetDevice() const { return Device; }
 
-    AVulkanTexture2D* GetViewportBackBuffer();
+private:
+    void InitizlizeInstance();
+    void InitizlizeDevice();
 
-    AVulkanGfxPipelineState* CreateGfxPipelineState(const AVulkanRenderTargetLayout& RTLayout /* GfxPSO Struct */);
+public:
+    void CreateViewport(void* WindowHandle, uint32_t SizeX, uint32_t SizeY, bool bIsFullscreen);
+    AVulkanTexture* GetViewportBackBuffer(int32_t Index) const;
 
+    AVulkanGraphicsPipelineState* CreateGraphicsPipelineState(const AVulkanRenderTargetLayout& RTLayout /* GraphicsPSO Struct */);
+
+    void SetViewport(float MinX, float MinY, float MinZ = 0.0f, float MaxZ = 1.0f);
     void SetViewport(float MinX, float MinY, float MinZ, float MaxX, float MaxY, float MaxZ);
-    void SetScissorRect(bool bEnable, uint32_t MinX, uint32_t MinY, uint32_t MaxX, uint32_t MaxY);
-    void SetGraphicsPipelineState(AVulkanGfxPipelineState* PSO);
+    void SetScissorRect(int32_t MinX, int32_t MinY, int32_t MaxX, int32_t MaxY);
+    void SetGraphicsPipelineState(AVulkanGraphicsPipelineState* PSO);
 
     void BeginDrawing();
     void EndDrawing();
@@ -41,19 +50,9 @@ public:
     void EndRenderPass();
 
     void DrawPrimitive(uint32_t FirstVertexIndex, uint32_t NumPrimitives);
-
     void WaitIdle();
 
-    VkInstance GetInstance() const { return Instance; }
-
-    AVulkanDevice* GetDevice() const { return Device; }
-    AVulkanCommandBufferManager* GetCommandBufferManager() { return CommandBufferManager; }
-
-private:
-    void CreateInstance();
-    void SelectAndInitizlizeDevice();
-
-    void GetInstanceLayersAndExtensions(TArray<const AnsiChar*>& OutInstanceExtensions, TArray<const AnsiChar*>& OutInstanceLayers);
+    AVulkanViewport* Viewport;
 
 private:
     VkInstance Instance;
@@ -61,18 +60,18 @@ private:
     TArray<const AnsiChar*> InstanceLayers;
 
     AVulkanDevice* Device;
-    AVulkanViewport* Viewport;
-
-    AVulkanCommandBufferManager* CommandBufferManager;
-    AVulkanPipelineStateManager* PipelineStateManager;
-    AVulkanLayoutManager* LayoutManager;
-
-    AVulkanRenderingState* RenderingState;
 
 #ifdef VK_VALIDATION_ENABLE
-private:
     bool SetupDebugMessenger();
 
     VkDebugUtilsMessengerEXT DebugMessenger;
 #endif // VULKAN_VALIDATION_ENABLE
+
+    AVulkanCommandBuffer* CmdBuffer;
+    AVulkanCommandBufferPool* CmdBufferPool;
+
+    AVulkanFence* Fence;
+
+    AVulkanPipelineStateManager* PipelineStateManager;
+    AVulkanRenderPassManager* RenderPassManager;
 };

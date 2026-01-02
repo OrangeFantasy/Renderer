@@ -2,11 +2,11 @@
 
 #include "VulkanApi.h"
 
-class AVulkanRHI;
-class AVulkanQueue;
 class AVulkanFenceManager;
-class AVulkanShaderManager;
 class AVulkanPipelineStateManager;
+class AVulkanQueue;
+class AVulkanRHI;
+class AVulkanShaderManager;
 
 class AVulkanDevice
 {
@@ -27,12 +27,12 @@ public:
     inline VkPhysicalDeviceProperties GetPhysicalDeviceProperties() const { return GpuProps; }
     inline const VkFormatProperties* GetFormatProperties() const { return FormatProperties; }
 
-    inline AVulkanQueue* GetGraphicsQueue() const { return GfxQueue; }
+    inline AVulkanQueue* GetGraphicsQueue() const { return GraphicsQueue; }
     inline AVulkanQueue* GetComputeQueue() const { return ComputeQueue; }
     inline AVulkanQueue* GetTransferQueue() const { return TransferQueue; }
     inline AVulkanQueue* GetPresentQueue() const { return PresentQueue; }
 
-    inline AVulkanFenceManager* GetFenceManager() const { return FenceManager; }
+    //inline AVulkanFenceManager* GetFenceManager() const { return FenceManager; }
     inline AVulkanShaderManager* GetShaderManager() const { return ShaderManager; }
 
 private:
@@ -51,7 +51,7 @@ private:
     TArray<VkQueueFamilyProperties> QueueFamilyProps;
     VkFormatProperties FormatProperties[VK_FORMAT_RANGE_SIZE];
 
-    AVulkanQueue* GfxQueue;
+    AVulkanQueue* GraphicsQueue;
     AVulkanQueue* ComputeQueue;
     AVulkanQueue* TransferQueue;
     AVulkanQueue* PresentQueue;
@@ -59,7 +59,7 @@ private:
     TArray<const AnsiChar*> DeviceExtensions;
     TArray<const AnsiChar*> ValidationLayers;
 
-    AVulkanFenceManager* FenceManager;
+    //AVulkanFenceManager* FenceManager;
     AVulkanShaderManager* ShaderManager;
 
     AVulkanRHI* RHI;

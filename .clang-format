@@ -18,4 +18,4 @@ PointerAlignment: Left
 SortIncludes: false
 TabWidth: '4'
 UseTab: Never
-
+Cpp11BracedListStyle: false

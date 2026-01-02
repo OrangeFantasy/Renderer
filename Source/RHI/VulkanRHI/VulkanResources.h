@@ -3,62 +3,87 @@
 #include "VulkanApi.h"
 
 class AVulkanDevice;
-class AVulkanCmdBuffer;
+class AVulkanCommandBuffer;
 struct AVulkanTexture;
 
-struct AVulkanTextureView
+//struct AVulkanTextureView
+//{
+//    AVulkanTextureView() : View(VK_NULL_HANDLE), Image(VK_NULL_HANDLE) { }
+//
+//    void Create(AVulkanDevice* Device, VkImage Image, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, VkFormat Format, uint32_t FirstMip,
+//        uint32_t NumMips, uint32_t ArraySliceIndex, uint32_t NumArraySlices);
+//    void Destory(AVulkanDevice* Device);
+//
+//    VkImageView View;
+//    VkImage Image;
+//};
+//
+//struct AVulkanDeviceChild
+//{
+//    AVulkanDeviceChild(AVulkanDevice* InDevice = nullptr) : Device(InDevice) { }
+//    virtual ~AVulkanDeviceChild() {}
+//
+//protected:
+//    AVulkanDevice* Device;
+//    using Super = AVulkanDeviceChild;
+//};
+//
+//struct AVulkanSurface : public AVulkanDeviceChild
+//{
+//    AVulkanSurface(AVulkanDevice* Device, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ, uint32_t ArraySize,
+//        uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags);
+//    AVulkanSurface(AVulkanDevice* Device, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ, uint32_t ArraySize,
+//        uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags, VkImage Image);
+//    virtual ~AVulkanSurface() override;
+//
+//    inline uint32_t NumOfArrayLevels() const
+//    {
+//        switch (ViewType)
+//        {
+//        case VK_IMAGE_VIEW_TYPE_1D:
+//        case VK_IMAGE_VIEW_TYPE_2D:
+//        case VK_IMAGE_VIEW_TYPE_3D:
+//            return 1;
+//        case VK_IMAGE_VIEW_TYPE_2D_ARRAY:
+//            return ArraySize;
+//        case VK_IMAGE_VIEW_TYPE_CUBE:
+//            return 6;
+//        case VK_IMAGE_VIEW_TYPE_CUBE_ARRAY:
+//            return 6 * ArraySize;
+//        default:
+//            check(false);
+//            return 1;
+//        }
+//    }
+//
+//    VkImage Image;
+//    VkFormat PixelFormat;
+//
+//    uint32_t Width;
+//    uint32_t Height;
+//    uint32_t Depth;
+//    uint32_t ArraySize;
+//
+//    uint32_t NumMips;
+//    uint32_t NumSamples;
+//
+//    VkImageTiling Tiling;
+//    VkImageViewType ViewType;
+//    VkImageAspectFlags AspectMask;
+//
+//    //AVulkanTexture* OwningTexture;
+//};
+
+struct AVulkanTexture
 {
-    AVulkanTextureView() : View(VK_NULL_HANDLE), Image(VK_NULL_HANDLE) {}
-
-    void Create(AVulkanDevice* Device, VkImage Image, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, VkFormat Format, uint32_t FirstMip,
-        uint32_t NumMips, uint32_t ArraySliceIndex, uint32_t NumArraySlices);
-    void Destory(AVulkanDevice* Device);
-
-    VkImageView View;
-    VkImage Image;
-};
-
-struct AVulkanDeviceChild
-{
-    AVulkanDeviceChild(AVulkanDevice* InDevice = nullptr) : Device(InDevice) {}
-    virtual ~AVulkanDeviceChild() {}
-
-    inline AVulkanDevice* GetParent() const { return Device; }
-
-protected:
-    AVulkanDevice* Device;
-    using Super = AVulkanDeviceChild;
-};
-
-struct AVulkanSurface : public AVulkanDeviceChild
-{
-    AVulkanSurface(AVulkanDevice* Device, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ, uint32_t ArraySize,
+    AVulkanTexture(AVulkanDevice* Device, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ, uint32_t ArraySize,
         uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags);
-    AVulkanSurface(AVulkanDevice* Device, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ, uint32_t ArraySize,
+    AVulkanTexture(AVulkanDevice* Device, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ, uint32_t ArraySize,
         uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags, VkImage Image);
-    virtual ~AVulkanSurface() override;
-
-    inline uint32_t NumOfArrayLevels() const
-    {
-        switch (ViewType)
-        {
-        case VK_IMAGE_VIEW_TYPE_1D:
-        case VK_IMAGE_VIEW_TYPE_2D:
-        case VK_IMAGE_VIEW_TYPE_3D:
-            return 1;
-        case VK_IMAGE_VIEW_TYPE_2D_ARRAY:
-            return ArraySize;
-        case VK_IMAGE_VIEW_TYPE_CUBE:
-            return 6;
-        case VK_IMAGE_VIEW_TYPE_CUBE_ARRAY:
-            return 6 * ArraySize;
-        default:
-            check(false);
-            return 1;
-        }
-    }
+    ~AVulkanTexture();
 
     VkImage Image;
+    VkImageView View;
     VkFormat PixelFormat;
 
     uint32_t Width;
@@ -73,31 +98,25 @@ struct AVulkanSurface : public AVulkanDeviceChild
     VkImageViewType ViewType;
     VkImageAspectFlags AspectMask;
 
-    AVulkanTexture* OwningTexture;
+    //AVulkanSurface Surface;
+    //AVulkanTextureView TextureView;
+
+    AVulkanDevice* Device;
+
+private:
+    void CreateTextureView();
 };
 
-struct AVulkanTexture : public AVulkanDeviceChild
-{
-    AVulkanTexture(AVulkanDevice* Device, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ, uint32_t ArraySize,
-        uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags);
-    AVulkanTexture(AVulkanDevice* Device, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ, uint32_t ArraySize,
-        uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags, VkImage Image);
-    virtual ~AVulkanTexture() override;
-
-    AVulkanSurface Surface;
-    AVulkanTextureView TextureView;
-};
-
-struct AVulkanTexture2D : public AVulkanTexture
-{
-    AVulkanTexture2D(
-        AVulkanDevice* Device, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags);
-    AVulkanTexture2D(AVulkanDevice* Device, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t NumMips, uint32_t NumSamples,
-        VkImageAspectFlags AspectFlags, VkImage Image);
-
-    uint32_t SizeX;
-    uint32_t SizeY;
-};
+//struct AVulkanTexture2D : public AVulkanTexture
+//{
+//    AVulkanTexture2D(
+//        AVulkanDevice* Device, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags);
+//    AVulkanTexture2D(AVulkanDevice* Device, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t NumMips, uint32_t NumSamples,
+//        VkImageAspectFlags AspectFlags, VkImage Image);
+//
+//    uint32_t SizeX;
+//    uint32_t SizeY;
+//};
 
 struct AVulkanRenderTargetView
 {
@@ -213,6 +232,8 @@ public:
     ~AVulkanRenderPass();
 
     inline VkRenderPass GetHandle() const { return RenderPass; }
+    inline const AVulkanRenderTargetLayout& GetLayout() const { return Layout; }
+    inline uint32_t GetNumUsedClearValues() const { return NumUsedClearValues; }
 
 private:
     VkRenderPass RenderPass;
@@ -235,7 +256,7 @@ public:
     inline uint32_t GetHeight() const { return Extents.height; }
 
 public:
-    TArray<AVulkanTextureView> AttachmentTextureViews;
+    //TArray<AVulkanTextureView> AttachmentTextureViews;
 
 private:
     VkFramebuffer Framebuffer;
@@ -250,24 +271,20 @@ private:
     AVulkanDevice* Device;
 };
 
-class AVulkanLayoutManager
+class AVulkanRenderPassManager
 {
 public:
-    AVulkanLayoutManager() : CurrentRenderPass(nullptr), CurrentFramebuffer(nullptr) {}
-    ~AVulkanLayoutManager();
+    AVulkanRenderPassManager(AVulkanDevice* InDevice) : Device(InDevice) { }
+    ~AVulkanRenderPassManager();
 
-    AVulkanRenderPass* GetOrCreateRenderPass(AVulkanDevice* Device, const AVulkanRenderTargetLayout& RTLayout);
+    AVulkanRenderPass* GetOrCreateRenderPass(const AVulkanRenderTargetLayout& RTLayout);
 
     AVulkanFramebuffer* GetOrCreateFramebuffer(
-        AVulkanDevice* Device, const AVulkanRenderTargetsInfo& RTInfo, const AVulkanRenderTargetLayout& RTLayout, AVulkanRenderPass* RenderPass);
+        const AVulkanRenderTargetsInfo& RTInfo, const AVulkanRenderTargetLayout& RTLayout, AVulkanRenderPass* RenderPass);
 
-    // void BeginRenderPass(AVulkanDevice* Device, AVulkanCmdBuffer* CmdBuffer, const AVulkanRenderTargetLayout& RTLayout,
+    // void BeginRenderPass(AVulkanDevice* Device, AVulkanCommandBuffer* CmdBuffer, const AVulkanRenderTargetLayout& RTLayout,
     //     AVulkanRenderPass* RenderPass, AVulkanFramebuffer* Framebuffer);
-    // void EndRenderPass(AVulkanCmdBuffer* CmdBuffer);
-
-public:
-    AVulkanRenderPass* CurrentRenderPass;
-    AVulkanFramebuffer* CurrentFramebuffer;
+    // void EndRenderPass(AVulkanCommandBuffer* CmdBuffer);
 
 private:
     TMap<uint64_t, AVulkanRenderPass*> RenderPasses;
@@ -277,4 +294,6 @@ private:
         TArray<AVulkanFramebuffer*> Framebuffer;
     };
     TMap<uint64_t, FFramebufferList*> Framebuffers;
+
+    AVulkanDevice* Device;
 };

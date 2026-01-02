@@ -24,7 +24,9 @@ public:
     AVulkanFence(AVulkanDevice* Device, AVulkanFenceManager* Owner, bool bCreateSignaled);
     ~AVulkanFence();
 
-    inline bool IsSignaled() const { return State == EState::Signaled; }
+    bool IsSignaled();
+    bool WaitFor(uint64_t TimeInNanoseconds);
+    void Reset();
 
     inline VkFence GetHandle() const { return Handle; }
     inline AVulkanFenceManager* GetOwner() { return Owner; }
@@ -43,27 +45,4 @@ private:
     AVulkanDevice* Device;
 
     friend AVulkanFenceManager;
-};
-
-class AVulkanFenceManager
-{
-public:
-    AVulkanFenceManager(AVulkanDevice* Device);
-    ~AVulkanFenceManager();
-
-    AVulkanFence* AllocateFence(bool bCreateSignaled = false);
-    void ReleaseFence(AVulkanFence* Fence);
-
-    void ResetFence(AVulkanFence* Fence);
-    bool WaitForFence(AVulkanFence* Fence, uint64_t TimeInNanoseconds);
-    void WaitAndReleaseFence(AVulkanFence* Fence, uint64_t TimeInNanoseconds);
-
-    bool IsFenceSignaled(AVulkanFence* Fence);
-
-private:
-    bool CheckFenceState(AVulkanFence* Fence);
-
-    AVulkanDevice* Device;
-    TArray<AVulkanFence*> FreeFences;
-    TArray<AVulkanFence*> UsedFences;
 };

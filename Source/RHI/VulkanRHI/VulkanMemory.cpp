@@ -19,6 +19,10 @@ AVulkanSemaphore::~AVulkanSemaphore()
     Handle = VK_NULL_HANDLE;
 }
 
+////////////////////////////////////////
+//            Vulkan Fence            //
+////////////////////////////////////////
+
 AVulkanFence::AVulkanFence(AVulkanDevice* InDevice, AVulkanFenceManager* InOwner, bool bCreateSignaled)
     : Handle(VK_NULL_HANDLE), Device(InDevice), Owner(InOwner), State(bCreateSignaled ? EState::Signaled : EState::NotReady)
 {
@@ -28,80 +32,41 @@ AVulkanFence::AVulkanFence(AVulkanDevice* InDevice, AVulkanFenceManager* InOwner
     VK_CHECK_RESULT(VulkanApi::vkCreateFence(InDevice->GetHandle(), &FenceInfo, VK_CPU_ALLOCATOR, &Handle));
 }
 
-////////////////////////////////////////
-//            Vulkan Fence            //
-////////////////////////////////////////
-
 AVulkanFence::~AVulkanFence()
 {
     VulkanApi::vkDestroyFence(Device->GetHandle(), Handle, VK_CPU_ALLOCATOR);
     Handle = VK_NULL_HANDLE;
 }
 
-AVulkanFenceManager::AVulkanFenceManager(AVulkanDevice* InDevice) : Device(InDevice)
+bool AVulkanFence::IsSignaled()
 {
-}
-
-////////////////////////////////////////
-//        Vulkan Fence Manager        //
-////////////////////////////////////////
-
-AVulkanFenceManager::~AVulkanFenceManager()
-{
-    for (AVulkanFence* Fence : FreeFences)
+    if (State != EState::Signaled)
     {
-        delete Fence;
-        Fence = nullptr;
-    }
-}
-
-AVulkanFence* AVulkanFenceManager::AllocateFence(bool bCreateSignaled)
-{
-    if (FreeFences.Num() != 0)
-    {
-        AVulkanFence* Fence = FreeFences[0];
-        FreeFences.RemoveAt(0);
-        UsedFences.Add(Fence);
-
-        if (bCreateSignaled)
+        VkResult Result = VulkanApi::vkGetFenceStatus(Device->GetHandle(), Handle);
+        switch (Result)
         {
-            Fence->State = AVulkanFence::EState::Signaled;
+        case VK_SUCCESS:
+            State = EState::Signaled;
+            break;
+        case VK_NOT_READY:
+            break;
+        default:
+            VK_CHECK_RESULT(Result);
+            break;
         }
-        return Fence;
     }
-
-    AVulkanFence* NewFence = new AVulkanFence(Device, this, bCreateSignaled);
-    UsedFences.Add(NewFence);
-    return NewFence;
+    return State == EState::Signaled;
 }
 
-void AVulkanFenceManager::ReleaseFence(AVulkanFence* Fence)
+bool AVulkanFence::WaitFor(uint64_t TimeInNanoseconds)
 {
-    ResetFence(Fence);
-    UsedFences.RemoveFirst(Fence);
-    FreeFences.Add(Fence);
-    Fence = nullptr;
-}
+    check(State == EState::NotReady, "Fence's state is Signaled");
 
-void AVulkanFenceManager::ResetFence(AVulkanFence* Fence)
-{
-    if (Fence->State != AVulkanFence::EState::NotReady)
-    {
-        VK_CHECK_RESULT(VulkanApi::vkResetFences(Device->GetHandle(), 1, &Fence->Handle));
-        Fence->State = AVulkanFence::EState::NotReady;
-    }
-}
-
-bool AVulkanFenceManager::WaitForFence(AVulkanFence* Fence, uint64_t TimeInNanoseconds)
-{
-    check(UsedFences.Contains(Fence));
-    check(Fence->State == AVulkanFence::EState::NotReady, "Fence's state is Signaled");
-
-    VkResult Result = VulkanApi::vkWaitForFences(Device->GetHandle(), 1, &Fence->Handle, true, TimeInNanoseconds);
+    VkResult Result = VulkanApi::vkWaitForFences(Device->GetHandle(), 1, &Handle, true, TimeInNanoseconds);
     switch (Result)
     {
     case VK_SUCCESS:
-        Fence->State = AVulkanFence::EState::Signaled;
+        State = AVulkanFence::EState::Signaled;
         return true;
     case VK_TIMEOUT:
         break;
@@ -113,43 +78,11 @@ bool AVulkanFenceManager::WaitForFence(AVulkanFence* Fence, uint64_t TimeInNanos
     return false;
 }
 
-void AVulkanFenceManager::WaitAndReleaseFence(AVulkanFence* Fence, uint64_t TimeInNanoseconds)
+void AVulkanFence::Reset()
 {
-    if (!Fence->IsSignaled())
+    if (State != AVulkanFence::EState::NotReady)
     {
-        WaitForFence(Fence, TimeInNanoseconds);
+        VK_CHECK_RESULT(VulkanApi::vkResetFences(Device->GetHandle(), 1, &Handle));
+        State = AVulkanFence::EState::NotReady;
     }
-
-    ResetFence(Fence);
-    UsedFences.RemoveFirst(Fence);
-    FreeFences.Add(Fence);
-    Fence = nullptr;
-}
-
-bool AVulkanFenceManager::IsFenceSignaled(AVulkanFence* Fence)
-{
-    return Fence->IsSignaled() ? true : CheckFenceState(Fence);
-}
-
-bool AVulkanFenceManager::CheckFenceState(AVulkanFence* Fence)
-{
-    check(UsedFences.Contains(Fence), "Fence is not used.");
-    check(Fence->State == AVulkanFence::EState::NotReady);
-
-    VkResult Result = VulkanApi::vkGetFenceStatus(Device->GetHandle(), Fence->Handle);
-    switch (Result)
-    {
-    case VK_SUCCESS:
-        Fence->State = AVulkanFence::EState::Signaled;
-        return true;
-
-    case VK_NOT_READY:
-        break;
-
-    default:
-        VK_CHECK_RESULT(Result);
-        break;
-    }
-
-    return false;
 }

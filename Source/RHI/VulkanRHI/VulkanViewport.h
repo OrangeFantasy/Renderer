@@ -2,16 +2,20 @@
 
 #include "VulkanApi.h"
 
-class AVulkanRHI;
+class AVulkanCommandBuffer;
 class AVulkanDevice;
+class AVulkanFence;
 class AVulkanQueue;
-class AVulkanSwapChain;
-class AVulkanCmdBuffer;
+class AVulkanRHI;
 class AVulkanSemaphore;
 
-struct AVulkanTexture2D;
-struct AVulkanTextureView;
-struct AVulkanSwapChainRecreateInfo;
+struct AVulkanTexture;
+
+struct AVulkanSwapChainRecreateInfo
+{
+    VkSwapchainKHR SwapChain;
+    VkSurfaceKHR Surface;
+};
 
 class AVulkanViewport
 {
@@ -19,53 +23,44 @@ public:
     AVulkanViewport(AVulkanRHI* RHI, AVulkanDevice* Device, void* WindowHandle, uint32_t SizeX, uint32_t SizeY, bool bIsFullscreen);
     ~AVulkanViewport();
 
-    void SetViewport(AVulkanCmdBuffer* CmdBuffer, float MinX, float MinY, float MinZ = 0.0f, float MaxZ = 1.0f);
-    void SetViewport(AVulkanCmdBuffer* CmdBuffer, float MinX, float MinY, float MinZ, float MaxX, float MaxY, float MaxZ);
-    void SetScissorRect(AVulkanCmdBuffer* CmdBuffer, uint32_t MinX, uint32_t MinY, uint32_t Width, uint32_t Height);
+    void SetViewport(AVulkanCommandBuffer* CmdBuffer, float MinX, float MinY, float MinZ = 0.0f, float MaxZ = 1.0f);
+    void SetViewport(AVulkanCommandBuffer* CmdBuffer, float MinX, float MinY, float MinZ, float MaxX, float MaxY, float MaxZ);
+    void SetScissorRect(AVulkanCommandBuffer* CmdBuffer, int32_t MinX, int32_t MinY, int32_t Width, int32_t Height);
 
     void RecreateSwapchain(void* WindowHandle);
 
-    AVulkanTexture2D* GetBackBuffer();
-    void ClearBackBuffer();
+    AVulkanTexture* AcquireNextBackBuffer();
+    void Present(AVulkanCommandBuffer* CmdBuffer, AVulkanQueue* Queue, AVulkanQueue* PresentQueue, AVulkanFence* Fence);
 
-    bool Present(AVulkanCmdBuffer* CmdBuffer, AVulkanQueue* Queue, AVulkanQueue* PresentQueue);
-
-    inline AVulkanSwapChain* GetSwapChain() const { return SwapChain; }
-
-    VkFormat GetSwapchainImageFormat() const;
+    AVulkanTexture* GetBackBuffer(int32_t Index) const;
 
 private:
     void CreateSwapchain(AVulkanSwapChainRecreateInfo* RecreateInfo = nullptr);
-    void DestroySwapchain(struct AVulkanSwapChainRecreateInfo* RecreateInfo);
+    void DestroySwapchain(struct AVulkanSwapChainRecreateInfo* RecreateInfo = nullptr);
 
     void Resize(uint32_t SizeX, uint32_t SizeY, bool bIsFullscreen);
 
-    void AcquireImageIndex();
-    void AcquireBackBufferImage();
+private:
+    uint32_t NumBackBuffers = 3;
 
-public:
-    enum
-    {
-        NUM_BUFFERS = 3
-    };
-
+    void* WindowHandle;
     uint32_t SizeX;
     uint32_t SizeY;
     bool bIsFullscreen;
-    void* WindowHandle;
-
-    AVulkanSwapChain* SwapChain;
-
-    TArray<VkImage> BackBufferImages;
-    TArray<AVulkanSemaphore*> RenderingDoneSemaphores; // new in this.
-    TArray<AVulkanTextureView> TextureViews;
-    AVulkanTexture2D* BackBuffer;
-
-    int32_t AcquiredImageIndex;
-    AVulkanSemaphore* AcquiredSemaphore; // new in SwapChain.
 
     VkViewport Viewport;
     VkRect2D Scissor;
+
+    VkSwapchainKHR SwapChain;
+    VkSurfaceKHR Surface;
+    VkFormat SwapChainImageFormat;
+    TArray<VkImage> SwapChainImages;
+
+    TArray<AVulkanTexture*> BackBuffers;
+    TArray<AVulkanSemaphore*> ImageAcquiredSemaphores;
+    TArray<AVulkanSemaphore*> RenderingDoneSemaphores;
+
+    int32_t AcquiredIndex;
 
     AVulkanDevice* Device;
     AVulkanRHI* RHI;

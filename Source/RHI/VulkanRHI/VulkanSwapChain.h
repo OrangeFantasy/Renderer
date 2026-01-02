@@ -2,9 +2,9 @@
 
 #include "VulkanApi.h"
 
-class AVulkanRHI;
 class AVulkanDevice;
 class AVulkanQueue;
+class AVulkanRHI;
 class AVulkanSemaphore;
 
 struct AVulkanSwapChainRecreateInfo
@@ -19,8 +19,7 @@ public:
     AVulkanSwapChain(AVulkanRHI* RHI, AVulkanDevice* Device, void* WindowHandle, bool bIsFullScreen, uint32_t& InOutWidth, uint32_t& InOutHeight,
         uint32_t& InOutNumBackBuffers, TArray<VkImage>& OutImages, AVulkanSwapChainRecreateInfo* RecreateInfo);
 
-    int32_t AcquireImageIndex(AVulkanSemaphore** OutSemaphore);
-    void Present(AVulkanQueue* PresentQueue, AVulkanSemaphore* BackBufferRenderingDoneSemaphore);
+    int32_t AcquireNextImageIndex(VkSemaphore* AcquiredSemaphore);
     void Destroy(AVulkanSwapChainRecreateInfo* RecreateInfo = nullptr);
 
     inline VkSwapchainKHR GetHandle() const { return SwapChain; }
@@ -29,9 +28,9 @@ public:
 private:
     VkSwapchainKHR SwapChain;
     VkSurfaceKHR Surface;
-    VkFormat ImageFormat = VK_FORMAT_UNDEFINED;
+    VkFormat ImageFormat;
 
-    TArray<AVulkanSemaphore*> ImageAcquiredSemaphore;
+    TArray<AVulkanSemaphore*> ImageAcquiredSemaphores;
     int32_t SemaphoreIndex;
     int32_t CurrentImageIndex;
 

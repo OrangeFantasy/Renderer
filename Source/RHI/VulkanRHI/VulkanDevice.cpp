@@ -6,8 +6,8 @@
 #include "VulkanPipeline.h"
 
 AVulkanDevice::AVulkanDevice(AVulkanRHI* InRHI, VkPhysicalDevice InGpu)
-    : RHI(InRHI), Device(VK_NULL_HANDLE), Gpu(InGpu), GfxQueue(nullptr), ComputeQueue(nullptr), TransferQueue(nullptr), PresentQueue(nullptr),
-      FenceManager(nullptr), ShaderManager(nullptr)
+    : RHI(InRHI), Device(VK_NULL_HANDLE), Gpu(InGpu), GraphicsQueue(nullptr), ComputeQueue(nullptr), TransferQueue(nullptr), PresentQueue(nullptr),
+      /*FenceManager(nullptr),*/ ShaderManager(nullptr)
 {
     AMemory::Memzero(GpuProps);
     AMemory::Memzero(PhysicalFeatures);
@@ -15,6 +15,7 @@ AVulkanDevice::AVulkanDevice(AVulkanRHI* InRHI, VkPhysicalDevice InGpu)
 
     VulkanApi::vkGetPhysicalDeviceProperties(Gpu, &GpuProps);
     VendorId = static_cast<EGpuVendorId>(GpuProps.vendorID);
+    //VulkanApi::vkGetPhysicalDeviceProperties2KHR
     check(VendorId != EGpuVendorId::Unknown, "Unknown GPU Vendor.");
 }
 
@@ -34,7 +35,7 @@ void AVulkanDevice::Initizlize()
     CreateDevice();
     SetupFormats();
 
-    FenceManager = new AVulkanFenceManager(this);
+    //FenceManager = new AVulkanFenceManager(this);
     ShaderManager = new AVulkanShaderManager(this);
 }
 
@@ -63,7 +64,7 @@ void AVulkanDevice::CreateDevice()
     TArray<VkDeviceQueueCreateInfo> QueueFamilyInfos;
     uint32_t NumPriorities = 0;
 
-    int32_t GfxQueueFamilyIndex = -1;
+    int32_t GraphicsQueueFamilyIndex = -1;
     int32_t ComputeQueueFamilyIndex = -1;
     int32_t TransferQueueFamilyIndex = -1;
 
@@ -74,9 +75,9 @@ void AVulkanDevice::CreateDevice()
 
         if ((CurrProps.queueFlags & VK_QUEUE_GRAPHICS_BIT) == VK_QUEUE_GRAPHICS_BIT)
         {
-            if (GfxQueueFamilyIndex == -1)
+            if (GraphicsQueueFamilyIndex == -1)
             {
-                GfxQueueFamilyIndex = FamilyIndex;
+                GraphicsQueueFamilyIndex = FamilyIndex;
                 bIsValidQueue = true;
             }
             else
@@ -87,7 +88,7 @@ void AVulkanDevice::CreateDevice()
 
         if ((CurrProps.queueFlags & VK_QUEUE_COMPUTE_BIT) == VK_QUEUE_COMPUTE_BIT)
         {
-            if (ComputeQueueFamilyIndex == -1 && GfxQueueFamilyIndex != FamilyIndex)
+            if (ComputeQueueFamilyIndex == -1 && GraphicsQueueFamilyIndex != FamilyIndex)
             {
                 ComputeQueueFamilyIndex = FamilyIndex;
                 bIsValidQueue = true;
@@ -96,7 +97,7 @@ void AVulkanDevice::CreateDevice()
 
         if ((CurrProps.queueFlags & VK_QUEUE_TRANSFER_BIT) == VK_QUEUE_TRANSFER_BIT)
         {
-            // Prefer a non-gfx transfer queue
+            // Prefer a non-Graphics transfer queue
             if (TransferQueueFamilyIndex == -1 && (CurrProps.queueFlags & VK_QUEUE_GRAPHICS_BIT) != VK_QUEUE_GRAPHICS_BIT &&
                 (CurrProps.queueFlags & VK_QUEUE_COMPUTE_BIT) != VK_QUEUE_COMPUTE_BIT)
             {
@@ -137,11 +138,11 @@ void AVulkanDevice::CreateDevice()
     VK_CHECK_RESULT(VulkanApi::vkCreateDevice(Gpu, &DeviceInfo, VK_CPU_ALLOCATOR, &Device));
 
     // Create Graphics Queue, here we submit command buffers for execution
-    GfxQueue = new AVulkanQueue(this, GfxQueueFamilyIndex);
+    GraphicsQueue = new AVulkanQueue(this, GraphicsQueueFamilyIndex);
     if (ComputeQueueFamilyIndex == -1)
     {
         // If we didn't find a dedicated Queue, use the default one
-        ComputeQueueFamilyIndex = GfxQueueFamilyIndex;
+        ComputeQueueFamilyIndex = GraphicsQueueFamilyIndex;
     }
     ComputeQueue = new AVulkanQueue(this, ComputeQueueFamilyIndex);
     if (TransferQueueFamilyIndex == -1)
@@ -174,10 +175,10 @@ void AVulkanDevice::SetupPresentQueue(VkSurfaceKHR Surface)
             return (bSupportsPresent == VK_TRUE);
         };
 
-        bool bGfx = SupportsPresentFunc(Gpu, GfxQueue);
-        check(bGfx, "Cannot find a compatible Vulkan device that supports surface presentation.");
+        bool bGraphics = SupportsPresentFunc(Gpu, GraphicsQueue);
+        check(bGraphics, "Cannot find a compatible Vulkan device that supports surface presentation.");
 
-        PresentQueue = GfxQueue;
+        PresentQueue = GraphicsQueue;
     }
 }
 
@@ -185,15 +186,15 @@ void AVulkanDevice::Destory()
 {
     delete ShaderManager;
     ShaderManager = nullptr;
-    delete FenceManager;
-    FenceManager = nullptr;
+    //delete FenceManager;
+    //FenceManager = nullptr;
 
     delete TransferQueue;
     TransferQueue = nullptr;
     delete ComputeQueue;
     ComputeQueue = nullptr;
-    delete GfxQueue;
-    GfxQueue = nullptr;
+    delete GraphicsQueue;
+    GraphicsQueue = nullptr;
 
     VulkanApi::vkDestroyDevice(Device, nullptr);
     Device = VK_NULL_HANDLE;

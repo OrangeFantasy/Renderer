@@ -2,6 +2,8 @@
 
 #include "Core/BasicTypes.h"
 
+class AVulkanRHI;
+
 class ARenderer
 {
 public:
@@ -17,12 +19,11 @@ private:
     void* GetNativeWindowHandle() const;
 
 private:
-    void* Window = nullptr;
+    void* Window;
 
-    class AVulkanRHI* RHI = nullptr;
-    class FVulkanContext* RHIContext = nullptr;
+    AVulkanRHI* RHI;
 
-    int32_t WindowWidth = 0;
-    int32_t WindowHeight = 0;
+    int32_t WindowWidth;
+    int32_t WindowHeight;
     const AnsiChar* WindowTitle = "Vulkan Window";
 };

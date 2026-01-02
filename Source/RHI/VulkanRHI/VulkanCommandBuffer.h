@@ -3,33 +3,25 @@
 #include "VulkanApi.h"
 
 class AVulkanDevice;
-class AVulkanQueue;
-class AVulkanFence;
-class AVulkanSemaphore;
+class AVulkanRHI;
 class AVulkanRenderPass;
 class AVulkanFramebuffer;
-// class AVulkanFramebuffer_Old;
 class AVulkanCommandBufferPool;
-class AVulkanCommandBufferManager;
 
-class AVulkanCmdBuffer
+class AVulkanCommandBuffer
 {
 public:
-    AVulkanCmdBuffer(AVulkanDevice* Device, AVulkanCommandBufferPool* CommandBufferPool, bool bIsUploadOnly);
-    ~AVulkanCmdBuffer();
+    AVulkanCommandBuffer(AVulkanDevice* Device, AVulkanCommandBufferPool* CmdBufferPool);
+    ~AVulkanCommandBuffer();
 
-    inline AVulkanCommandBufferPool* GetOwner() const { return CommandBufferPool; }
+    inline AVulkanCommandBufferPool* GetOwner() const { return CmdBufferPool; }
     inline VkCommandBuffer GetHandle() const { return Handle; }
 
     void Begin();
     void End();
-
-    void BeginRenderPass(AVulkanRenderPass* RenderPass, AVulkanFramebuffer* Framebuffer, uint32_t NumClearValue, const VkClearValue* ClearValues);
+    void BeginRenderPass(AVulkanRenderPass* RenderPass, AVulkanFramebuffer* Framebuffer, const VkClearValue* ClearValues);
     void EndRenderPass();
-
-    void AddWaitSemaphore(VkPipelineStageFlags WaitFlags, AVulkanSemaphore* WaitSemaphore);
-    void MarkSemaphoresAsSubmitted();
-    void RefreshFenceStatus();
+    void Reset();
 
 public:
     enum class EState : uint8_t
@@ -39,7 +31,6 @@ public:
         IsInsideRenderPass,
         HasEnded,
         Submitted,
-        NotAllocated,
         NeedReset,
     };
 
@@ -48,32 +39,20 @@ public:
     inline bool HasBegun() const { return State == EState::IsInsideBegin || State == EState::IsInsideRenderPass; }
     inline bool HasEnded() const { return State == EState::HasEnded; }
     inline bool IsSubmitted() const { return State == EState::Submitted; }
-    inline bool IsAllocated() const { return State != EState::NotAllocated; }
 
-    EState State;
     VkViewport CurrentViewport;
     VkRect2D CurrentScissor;
-    bool bIsUploadOnly;
-    bool bHasPipeline;
-    bool bHasViewport;
-    bool bHasScissor;
-
-private:
-    void AllocMemory();
-    void FreeMemory();
+    EState State;
+    uint8_t bHasPipeline : 1;
+    uint8_t bHasViewport : 1;
+    uint8_t bHasScissor  : 1;
 
 private:
     VkCommandBuffer Handle;
 
-    TArray<VkPipelineStageFlags> WaitFlags;
-    TArray<AVulkanSemaphore*> WaitSemaphores;
-
-    AVulkanFence* Fence;
-
-    AVulkanCommandBufferPool* CommandBufferPool;
+    AVulkanCommandBufferPool* CmdBufferPool;
     AVulkanDevice* Device;
 
-    friend AVulkanQueue;
     friend AVulkanCommandBufferPool;
 };
 
@@ -83,42 +62,16 @@ public:
     AVulkanCommandBufferPool(AVulkanDevice* Device, uint32_t QueueFamilyIndex);
     ~AVulkanCommandBufferPool();
 
-    AVulkanCmdBuffer* CreateCmdBuffer(bool bIsUploadOnly);
-    void RefreshFenceStatus(AVulkanCmdBuffer* SkipCmdBuffer = nullptr);
+    AVulkanCommandBuffer* PrepareCommandBuffer();
+    void Reset(AVulkanCommandBuffer* SkipCmdBuffer = nullptr);
 
     inline VkCommandPool GetHandle() const { return Handle; }
 
 private:
     VkCommandPool Handle;
-    TArray<AVulkanCmdBuffer*> CmdBuffers;
+    TArray<AVulkanCommandBuffer*> CmdBuffers;
 
     AVulkanDevice* Device;
 
-    friend AVulkanCommandBufferManager;
-};
-
-class AVulkanCommandBufferManager
-{
-public:
-    AVulkanCommandBufferManager(AVulkanDevice* Device);
-    ~AVulkanCommandBufferManager();
-
-    AVulkanCmdBuffer* GetUploadCmdBuffer();
-    AVulkanCmdBuffer* GetActiveCmdBuffer();
-    AVulkanCmdBuffer* GetActiveCmdBufferDirect() { return ActiveCmdBuffer; }
-
-    void SubmitUploadCmdBuffer(uint32_t NumSignalSemaphores = 0, VkSemaphore* SignalSemaphores = nullptr);
-    void SubmitActiveCmdBuffer(const TArray<AVulkanSemaphore*>& SignalSemaphores);
-    void SubmitActiveCmdBufferFromPresent(AVulkanSemaphore* SignalSemaphore);
-
-    void PrepareForNewActiveCmdBuffer();
-
-private:
-    AVulkanDevice* Device;
-    AVulkanQueue* Queue;
-
-    AVulkanCommandBufferPool* Pool;
-
-    AVulkanCmdBuffer* ActiveCmdBuffer;
-    AVulkanCmdBuffer* UploadCmdBuffer;
+    friend AVulkanRHI;
 };

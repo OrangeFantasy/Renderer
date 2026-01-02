@@ -18,18 +18,26 @@ struct TA
 
 int main(int argc, char** argv)
 {
-    auto Ta = new TA;
-    std::cout << Ta->P << std::endl;
+    //auto Ta = new TA;
+    //std::cout << Ta->P << std::endl;
 
-    {
-        TRefCountPtr<TA> Ref1(Ta);
-        std::cout << Ta->P << "  " << Ref1.GetRefCount() << std::endl;
+    
+    //TArray<const char*> arr = {};
+    //{
+    //    char str[10] = "123445";
+    //    arr.AddUnique(str);
+    //}
+    
 
-        TRefCountPtr<TA> Ref2;
-        Ref2.operator=(std::move(Ref1));
-        std::cout << Ta->P << "  " << Ref2.GetRefCount() << std::endl;
-    }
-    std::cout << Ta->P << std::endl;
+    //{
+    //    TRefCountPtr<TA> Ref1(Ta);
+    //    std::cout << Ta->P << "  " << Ref1.GetRefCount() << std::endl;
+
+    //    TRefCountPtr<TA> Ref2;
+    //    Ref2.operator=(std::move(Ref1));
+    //    std::cout << Ta->P << "  " << Ref2.GetRefCount() << std::endl;
+    //}
+    //std::cout << Ta->P << std::endl;
 
      ARenderer Renderer = ARenderer();
      Renderer.MainTick();

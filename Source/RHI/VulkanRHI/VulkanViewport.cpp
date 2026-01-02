@@ -1,153 +1,254 @@
 #include "VulkanViewport.h"
 
-#include "VulkanRHI.h"
-#include "VulkanDevice.h"
-#include "VulkanQueue.h"
-#include "VulkanSwapChain.h"
 #include "VulkanCommandBuffer.h"
+#include "VulkanDevice.h"
 #include "VulkanMemory.h"
+#include "VulkanPlatform.h"
+#include "VulkanQueue.h"
 #include "VulkanResources.h"
+#include "VulkanRHI.h"
 
 AVulkanViewport::AVulkanViewport(AVulkanRHI* InRHI, AVulkanDevice* InDevice, void* InWindowHandle, uint32_t InSizeX, uint32_t InSizeY, bool bInIsFullscreen)
-    : RHI(InRHI), Device(InDevice), WindowHandle(InWindowHandle), SwapChain(nullptr), SizeX(InSizeX), SizeY(InSizeY), bIsFullscreen(bInIsFullscreen),
-      AcquiredSemaphore(nullptr), BackBuffer(nullptr)
+    : RHI(InRHI), Device(InDevice), WindowHandle(InWindowHandle), SizeX(InSizeX), SizeY(InSizeY), bIsFullscreen(bInIsFullscreen), SwapChain(VK_NULL_HANDLE),
+      AcquiredIndex(-1)
 {
-    AMemory::Memzero(BackBufferImages);
+    AMemory::Memzero(SwapChainImages);
     AMemory::Memzero(Viewport);
     AMemory::Memzero(Scissor);
 
     CreateSwapchain();
 
-    RenderingDoneSemaphores.Resize(NUM_BUFFERS);
-    for (int32_t Index = 0; Index < NUM_BUFFERS; ++Index)
+    // Get swapchain back buffers.
+    uint32_t NumSwapChainImages;
+    VK_CHECK_RESULT(VulkanApi::vkGetSwapchainImagesKHR(Device->GetHandle(), SwapChain, &NumSwapChainImages, nullptr));
+    SwapChainImages.Resize(NumSwapChainImages);
+    VK_CHECK_RESULT(VulkanApi::vkGetSwapchainImagesKHR(Device->GetHandle(), SwapChain, &NumSwapChainImages, SwapChainImages.GetData()));
+
+    // Create acquire Semaphore.
+    BackBuffers.Resize(NumSwapChainImages);
+    ImageAcquiredSemaphores.Resize(NumSwapChainImages);
+    RenderingDoneSemaphores.Resize(NumSwapChainImages);
+
+    for (uint32_t Index = 0; Index < NumSwapChainImages; ++Index)
     {
+        BackBuffers[Index] = new AVulkanTexture(
+            Device, VK_IMAGE_VIEW_TYPE_2D, SwapChainImageFormat, SizeX, SizeY, 1, 11, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT, SwapChainImages[Index]);
+
+        ImageAcquiredSemaphores[Index] = new AVulkanSemaphore(Device);
         RenderingDoneSemaphores[Index] = new AVulkanSemaphore(Device);
     }
 }
 
 AVulkanViewport::~AVulkanViewport()
 {
+    for (uint32_t Index = 0; Index < NumBackBuffers; ++Index)
     {
-        ClearBackBuffer();
-
-        delete BackBuffer;
-        BackBuffer = nullptr;
+        delete BackBuffers[Index];
+        BackBuffers[Index] = nullptr;
     }
 
-    for (int32_t Index = 0; Index < NUM_BUFFERS; ++Index)
+    for (uint32_t Index = 0; Index < NumBackBuffers; ++Index)
     {
-        AVulkanTextureView& TextureView = TextureViews[Index];
-        TextureView.Destory(Device);
+        AVulkanSemaphore* ImageAcquiredSemaphore = ImageAcquiredSemaphores[Index];
+        delete ImageAcquiredSemaphore;
+        ImageAcquiredSemaphore = nullptr;
 
-        AVulkanSemaphore* Semaphore = RenderingDoneSemaphores[Index];
-        delete Semaphore;
-        Semaphore = nullptr;
+        AVulkanSemaphore* RenderingDoneSemaphore = RenderingDoneSemaphores[Index];
+        delete RenderingDoneSemaphore;
+        RenderingDoneSemaphore = nullptr;
     }
 
-    SwapChain->Destroy();
-    delete SwapChain;
-    SwapChain = nullptr;
+    DestroySwapchain();
 }
 
 void AVulkanViewport::CreateSwapchain(AVulkanSwapChainRecreateInfo* RecreateInfo)
 {
-    uint32_t DesiredNumBackBuffers = NUM_BUFFERS;
-    SwapChain = new AVulkanSwapChain(RHI, Device, WindowHandle, bIsFullscreen, SizeX, SizeY, DesiredNumBackBuffers, BackBufferImages, RecreateInfo);
-    check(DesiredNumBackBuffers == NUM_BUFFERS, "The number of images is too few.");
-
-    std::cout << "[Info]: Viewport - SizeX: " << SizeX << ", SizeY: " << SizeY << "\n";
-
-    TextureViews.Resize(NUM_BUFFERS);
-    for (int32_t Index = 0; Index < NUM_BUFFERS; ++Index)
+    if (RecreateInfo != nullptr && RecreateInfo->SwapChain != VK_NULL_HANDLE)
     {
-        TextureViews[Index].Create(Device, BackBufferImages[Index], VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT, SwapChain->ImageFormat, 0, 1, 0, 1);
+        check(RecreateInfo->Surface != VK_NULL_HANDLE);
+        Surface = RecreateInfo->Surface;
+        RecreateInfo->Surface = VK_NULL_HANDLE;
+    }
+    else
+    {
+        VK_CHECK_RESULT(AVulkanPlatform::CreateSurface(WindowHandle, RHI->GetInstance(), &Surface));
     }
 
-    BackBuffer = new AVulkanTexture2D(Device, GetSwapchainImageFormat(), SizeX, SizeY, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT, VK_NULL_HANDLE);
-    AcquiredImageIndex = -1;
+    // Create present queue in device.
+    Device->SetupPresentQueue(Surface);
+    AVulkanQueue* PresentQueue = Device->GetPresentQueue();
+
+    VkBool32 bSupportsPresent;
+    VK_CHECK_RESULT(VulkanApi::vkGetPhysicalDeviceSurfaceSupportKHR(Device->GetPhysicalDeviceHandle(), PresentQueue->GetFamilyIndex(), Surface, &bSupportsPresent));
+    check(bSupportsPresent, "Physical device doesn't support present.");
+
+    // Select format.
+    uint32_t NumSurfaceFormats;
+    VK_CHECK_RESULT(VulkanApi::vkGetPhysicalDeviceSurfaceFormatsKHR(Device->GetPhysicalDeviceHandle(), Surface, &NumSurfaceFormats, nullptr));
+    TArray<VkSurfaceFormatKHR> SurfaceFormats(NumSurfaceFormats);
+    VK_CHECK_RESULT(VulkanApi::vkGetPhysicalDeviceSurfaceFormatsKHR(Device->GetPhysicalDeviceHandle(), Surface, &NumSurfaceFormats, SurfaceFormats.GetData()));
+
+    VkSurfaceFormatKHR SurfaceFormat = SurfaceFormats[0];
+    for (const VkSurfaceFormatKHR& Format : SurfaceFormats)
+    {
+        if ((Format.format == VK_FORMAT_B8G8R8A8_SRGB) && (Format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR))
+        {
+            SurfaceFormat = Format;
+            break;
+        }
+    }
+
+    SwapChainImageFormat = SurfaceFormat.format;
+
+    // Select present mode.
+    uint32_t NumPresentModes;
+    VK_CHECK_RESULT(VulkanApi::vkGetPhysicalDeviceSurfacePresentModesKHR(Device->GetPhysicalDeviceHandle(), Surface, &NumPresentModes, nullptr));
+    TArray<VkPresentModeKHR> PresentModes(NumPresentModes);
+    VK_CHECK_RESULT(VulkanApi::vkGetPhysicalDeviceSurfacePresentModesKHR(Device->GetPhysicalDeviceHandle(), Surface, &NumPresentModes, PresentModes.GetData()));
+
+    VkPresentModeKHR PresentMode = VK_PRESENT_MODE_FIFO_KHR;
+    for (const VkPresentModeKHR& Mode : PresentModes)
+    {
+        if (Mode == VK_PRESENT_MODE_MAILBOX_KHR)
+        {
+            PresentMode = Mode;
+        }
+    }
+
+    // Check the surface properties and formats.
+    VkSurfaceCapabilitiesKHR SurfProperties;
+    VK_CHECK_RESULT(VulkanApi::vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Device->GetPhysicalDeviceHandle(), Surface, &SurfProperties));
+
+    VkSurfaceTransformFlagBitsKHR PreTransform =
+        (SurfProperties.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) ? VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR : SurfProperties.currentTransform;
+    VkCompositeAlphaFlagBitsKHR CompositeAlpha =
+        (SurfProperties.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR) ? VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR : VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+
+    NumBackBuffers =
+        SurfProperties.maxImageCount > 0 ? std::min(std::max(NumBackBuffers, SurfProperties.minImageCount), SurfProperties.maxImageCount) : NumBackBuffers;
+    SizeX = SurfProperties.currentExtent.width  == 0xFFFFFFFF ? SizeX : SurfProperties.currentExtent.width;
+    SizeY = SurfProperties.currentExtent.height == 0xFFFFFFFF ? SizeY : SurfProperties.currentExtent.height;
+
+    VkSwapchainCreateInfoKHR SwapChainInfo;
+    ZeroVulkanStruct(SwapChainInfo, VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR);
+    SwapChainInfo.surface = Surface;
+    SwapChainInfo.minImageCount = NumBackBuffers;
+    SwapChainInfo.imageFormat = SurfaceFormat.format;
+    SwapChainInfo.imageColorSpace = SurfaceFormat.colorSpace;
+    SwapChainInfo.imageExtent.width = SizeX;
+    SwapChainInfo.imageExtent.height = SizeY;
+    SwapChainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    SwapChainInfo.preTransform = PreTransform;
+    SwapChainInfo.imageArrayLayers = 1;
+    SwapChainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    SwapChainInfo.presentMode = PresentMode;
+    SwapChainInfo.oldSwapchain = VK_NULL_HANDLE;
+
+    if (RecreateInfo != nullptr)
+    {
+        SwapChainInfo.oldSwapchain = RecreateInfo->SwapChain;
+    }
+
+    SwapChainInfo.clipped = VK_TRUE;
+    SwapChainInfo.compositeAlpha = CompositeAlpha;
+    SwapChainInfo.preTransform = SurfProperties.currentTransform;
+
+#if VK_SUPPORTS_FULLSCREEN_EXCLUSIVE
+    VkSurfaceFullScreenExclusiveInfoEXT FullScreenInfo;
+    ZeroVulkanStruct(FullScreenInfo, VK_STRUCTURE_TYPE_SURFACE_FULL_SCREEN_EXCLUSIVE_INFO_EXT);
+    FullScreenInfo.fullScreenExclusive = bIsFullScreen ? VK_FULL_SCREEN_EXCLUSIVE_ALLOWED_EXT : VK_FULL_SCREEN_EXCLUSIVE_DISALLOWED_EXT;
+    FullScreenInfo.pNext = (void*)SwapChainInfo.pNext;
+    SwapChainInfo.pNext = &FullScreenInfo;
+#endif
+
+    // Create swapchain.
+    VkResult Result = AVulkanPlatform::CreateSwapchainKHR(Device->GetHandle(), &SwapChainInfo, VK_CPU_ALLOCATOR, &SwapChain);
+#if VK_SUPPORTS_FULLSCREEN_EXCLUSIVE
+    if (Result == VK_ERROR_INITIALIZATION_FAILED)
+    {
+        std::cerr << "Create swapchain failed with Initialization error; removing FullScreen extension...\n";
+        SwapChainInfo.pNext = FullScreenInfo.pNext; // nullptr
+        Result = CVulkanPlatform::CreateSwapchainKHR(Device->GetHandle(), &SwapChainInfo, VK_CPU_ALLOCATOR, &SwapChain);
+    }
+#endif
+    VK_CHECK_RESULT(Result);
+
+    // Destory old swapchain if it isn't a nullptr.
+    if (RecreateInfo != nullptr)
+    {
+        if (RecreateInfo->SwapChain != VK_NULL_HANDLE)
+        {
+            AVulkanPlatform::DestroySwapchainKHR(Device->GetHandle(), RecreateInfo->SwapChain, VK_CPU_ALLOCATOR);
+            RecreateInfo->SwapChain = VK_NULL_HANDLE;
+        }
+        if (RecreateInfo->Surface != VK_NULL_HANDLE)
+        {
+            VulkanApi::vkDestroySurfaceKHR(RHI->GetInstance(), RecreateInfo->Surface, VK_CPU_ALLOCATOR);
+            RecreateInfo->Surface = VK_NULL_HANDLE;
+        }
+    }
 }
 
 void AVulkanViewport::DestroySwapchain(AVulkanSwapChainRecreateInfo* RecreateInfo)
 {
     Device->WaitUntilIdle();
 
-    delete BackBuffer;
-    BackBuffer = nullptr;
-
-    if (SwapChain)
+    if (RecreateInfo)
     {
-        SwapChain->Destroy(RecreateInfo);
-        delete SwapChain;
-        SwapChain = nullptr;
+        RecreateInfo->SwapChain = SwapChain;
+        RecreateInfo->Surface = Surface;
     }
-
-    AcquiredImageIndex = -1;
-}
-
-void AVulkanViewport::AcquireImageIndex()
-{
-    AcquiredImageIndex = SwapChain->AcquireImageIndex(&AcquiredSemaphore);
-}
-
-void AVulkanViewport::AcquireBackBufferImage()
-{
-    AVulkanSurface& Surface = BackBuffer->Surface;
-    if (Surface.Image == VK_NULL_HANDLE)
+    else
     {
-        AVulkanTextureView& TextureView = BackBuffer->TextureView;
-
-        check(AcquiredImageIndex == -1); //-V595
-        AcquireImageIndex();             //-V595
-        check(AcquiredImageIndex >= 0 && AcquiredImageIndex < TextureViews.Num());
-
-        AVulkanTextureView& ImageView = TextureViews[AcquiredImageIndex];
-        Surface.Image = ImageView.Image;
-        TextureView.View = ImageView.View;
-
-        // AVulkanCommandBufferManager* CmdBufferManager = RHI->GetCommandBufferManager();
-        // AVulkanCmdBuffer* CmdBuffer = CmdBufferManager->GetActiveCmdBuffer();
-        // check(!CmdBuffer->IsInsideRenderPass());
-
-        // Wait for semaphore signal before writing to backbuffer image
-        // CmdBuffer->AddWaitSemaphore(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, AcquiredSemaphore);
+        AVulkanPlatform::DestroySwapchainKHR(Device->GetHandle(), SwapChain, VK_CPU_ALLOCATOR);
+        VulkanApi::vkDestroySurfaceKHR(RHI->GetInstance(), Surface, VK_CPU_ALLOCATOR);
     }
+    SwapChain = VK_NULL_HANDLE;
+    Surface = VK_NULL_HANDLE;
+
+    AcquiredIndex = -1;
 }
 
-AVulkanTexture2D* AVulkanViewport::GetBackBuffer()
+AVulkanTexture* AVulkanViewport::AcquireNextBackBuffer()
 {
-    AcquireBackBufferImage();
-    return BackBuffer;
+    AcquiredIndex = (AcquiredIndex + 1) % NumBackBuffers;
+
+    VkSemaphore AcquiredSemaphore = ImageAcquiredSemaphores[AcquiredIndex]->GetHandle();
+    VK_CHECK_RESULT(VulkanApi::vkAcquireNextImageKHR(Device->GetHandle(), SwapChain, UINT64_MAX, AcquiredSemaphore, VK_NULL_HANDLE, (uint32_t*)(&AcquiredIndex)));
+
+    return BackBuffers[AcquiredIndex];
 }
 
-void AVulkanViewport::ClearBackBuffer()
+AVulkanTexture* AVulkanViewport::GetBackBuffer(int32_t Index) const
 {
-    BackBuffer->TextureView.View = VK_NULL_HANDLE;
-    BackBuffer->Surface.Image = VK_NULL_HANDLE;
+    if (Index < BackBuffers.Num())
+    {
+        return BackBuffers[Index];
+    }
+    return nullptr;
 }
 
-bool AVulkanViewport::Present(AVulkanCmdBuffer* CmdBuffer, AVulkanQueue* Queue, AVulkanQueue* PresentQueue)
+void AVulkanViewport::Present(AVulkanCommandBuffer* CmdBuffer, AVulkanQueue* Queue, AVulkanQueue* PresentQueue, AVulkanFence* Fence)
 {
-    check(CmdBuffer->IsOutsideRenderPass());
+    check(CmdBuffer->HasEnded());
 
-    // TODO: Copy image to backbuffer.
+    VkPipelineStageFlags SubmitWaitStageFlags[] = { VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT };
+    VkSemaphore SubmitWaitSemaphores[] = { ImageAcquiredSemaphores[AcquiredIndex]->GetHandle() };
+    VkSemaphore SubmitSignalSemaphores[] = { RenderingDoneSemaphores[AcquiredIndex]->GetHandle() };
+    Queue->Submit(CmdBuffer, 1, SubmitWaitSemaphores, SubmitWaitStageFlags, 1, SubmitSignalSemaphores, Fence);
+    CmdBuffer->State = AVulkanCommandBuffer::EState::Submitted;
 
-    CmdBuffer->End();
+    Fence->WaitFor(UINT64_MAX);
+    check(Fence->IsSignaled(), "Fence is not signaled.");
+    Fence->Reset();
 
-    AVulkanCommandBufferManager* CmdBufMgr = RHI->GetCommandBufferManager();
-    check(CmdBufMgr->GetActiveCmdBufferDirect() == CmdBuffer, TEXT("Present() is submitting something else than the active command buffer"));
-
-    CmdBuffer->AddWaitSemaphore(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, AcquiredSemaphore);
-    CmdBufMgr->SubmitActiveCmdBufferFromPresent(RenderingDoneSemaphores[AcquiredImageIndex]);
-
-    SwapChain->Present(PresentQueue, RenderingDoneSemaphores[AcquiredImageIndex]);
-
-    AcquiredImageIndex = -1;
-    return true;
+    VkSwapchainKHR PresentSwapChains[] = { SwapChain };
+    PresentQueue->Present(1, SubmitSignalSemaphores, PresentSwapChains, AcquiredIndex);
 }
 
 void AVulkanViewport::RecreateSwapchain(void* NewWindowHandle)
 {
-    AVulkanSwapChainRecreateInfo RecreateInfo = {VK_NULL_HANDLE, VK_NULL_HANDLE};
+    AVulkanSwapChainRecreateInfo RecreateInfo = { VK_NULL_HANDLE, VK_NULL_HANDLE };
     DestroySwapchain(&RecreateInfo);
     WindowHandle = NewWindowHandle;
     CreateSwapchain(&RecreateInfo);
@@ -165,38 +266,42 @@ void AVulkanViewport::Resize(uint32_t InSizeX, uint32_t InSizeY, bool bInIsFulls
     RecreateSwapchain(WindowHandle);
 }
 
-VkFormat AVulkanViewport::GetSwapchainImageFormat() const
-{
-    return SwapChain->ImageFormat;
-}
-
-void AVulkanViewport::SetViewport(AVulkanCmdBuffer* CmdBuffer, float MinX, float MinY, float MinZ, float MaxZ)
+void AVulkanViewport::SetViewport(AVulkanCommandBuffer* CmdBuffer, float MinX, float MinY, float MinZ, float MaxZ)
 {
     SetViewport(CmdBuffer, MinX, MinY, MinZ, MinX + SizeX, MinY + SizeY, MaxZ);
 }
 
-void AVulkanViewport::SetViewport(AVulkanCmdBuffer* CmdBuffer, float MinX, float MinY, float MinZ, float MaxX, float MaxY, float MaxZ)
+void AVulkanViewport::SetViewport(AVulkanCommandBuffer* CmdBuffer, float MinX, float MinY, float MinZ, float MaxX, float MaxY, float MaxZ)
 {
-    AMemory::Memzero(Viewport);
-    Viewport.x = MinX;
-    Viewport.y = MinY;
-    Viewport.width = MaxX - MinX;
-    Viewport.height = MaxY - MinY;
-    Viewport.minDepth = MinZ;
-    Viewport.maxDepth = MaxZ;
+    if (!CmdBuffer->bHasViewport || (AMemory::Memcmp((const void*)&CmdBuffer->CurrentViewport, (const void*)&Viewport, sizeof(VkViewport)) != 0))
+    {
+        Viewport.x = MinX;
+        Viewport.y = MinY;
+        Viewport.width = MaxX - MinX;
+        Viewport.height = MaxY - MinY;
+        Viewport.minDepth = MinZ;
+        Viewport.maxDepth = MinZ == MaxZ ? MinZ + 1.0f : MaxZ;
+        VulkanApi::vkCmdSetViewport(CmdBuffer->GetHandle(), 0, 1, &Viewport);
 
-    VulkanApi::vkCmdSetViewport(CmdBuffer->GetHandle(), 0, 1, &Viewport);
+        AMemory::Memcpy(CmdBuffer->CurrentViewport, Viewport);
+        CmdBuffer->bHasViewport = true;
+    }
 
-    SetScissorRect(CmdBuffer, (uint32_t)MinX, (uint32_t)MinY, (uint32_t)(MaxX - MinX), (uint32_t)(MaxY - MinY));
+    SetScissorRect(CmdBuffer, (int32_t)MinX, (int32_t)MinY, (int32_t)(MaxX - MinX), (int32_t)(MaxY - MinY));
 }
 
-void AVulkanViewport::SetScissorRect(AVulkanCmdBuffer* CmdBuffer, uint32_t MinX, uint32_t MinY, uint32_t Width, uint32_t Height)
+void AVulkanViewport::SetScissorRect(AVulkanCommandBuffer* CmdBuffer, int32_t MinX, int32_t MinY, int32_t Width, int32_t Height)
 {
-    AMemory::Memzero(Scissor);
-    Scissor.offset.x = MinX;
-    Scissor.offset.y = MinY;
-    Scissor.extent.width = Width;
-    Scissor.extent.height = Height;
+    if (!CmdBuffer->bHasScissor || (AMemory::Memcmp((const void*)&CmdBuffer->CurrentScissor, (const void*)&Scissor, sizeof(VkRect2D)) != 0))
+    {
+        Scissor.offset.x = MinX;
+        Scissor.offset.y = MinY;
+        Scissor.extent.width = Width;
+        Scissor.extent.height = Height;
 
-    VulkanApi::vkCmdSetScissor(CmdBuffer->GetHandle(), 0, 1, &Scissor);
+        VulkanApi::vkCmdSetScissor(CmdBuffer->GetHandle(), 0, 1, &Scissor);
+
+        AMemory::Memcpy(CmdBuffer->CurrentScissor, Scissor);
+        CmdBuffer->bHasScissor = true;
+    }
 }

@@ -24,5 +24,5 @@ using AFileStream = std::wfstream;
 template <typename Fty>
 using TFunction = std::function<Fty>;
 
-template <typename Ty>
-using TOptional = std::optional<Ty>;
+template <typename _Ty>
+using TOptional = std::optional<_Ty>;

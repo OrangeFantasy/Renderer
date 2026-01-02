@@ -9,23 +9,6 @@ class AVulkanShader;
 class AVulkanRenderPass;
 class AVulkanPipelineStateManager;
 
-class AVulkanPipeline
-{
-public:
-    AVulkanPipeline(AVulkanDevice* Device, AVulkanRenderPass* RenderPass);
-    ~AVulkanPipeline();
-
-    inline VkPipeline GetHandle() const { return Pipeline; }
-
-    inline VkPipelineLayout GetLayout() const { return Layout; }
-
-public:
-    VkPipeline Pipeline;
-    VkPipelineLayout Layout;
-
-    AVulkanDevice* Device;
-};
-
 namespace ShaderStage
 {
     enum EStage
@@ -57,18 +40,17 @@ public:
     AVulkanShaderManager(AVulkanDevice* Device);
     ~AVulkanShaderManager();
 
-    VkShaderModule GetOrCreateHandle(const AnsiChar* Spirv);
+    VkShaderModule GetOrCreateShader(const AnsiChar* Spirv);
 
 private:
     static TArray<uint32_t> ReadSpirv(const AnsiChar* Spirv);
-    VkShaderModule CreateShaderModule(AVulkanDevice* Device, const TArray<uint32_t>& Spirv);
 
 private:
     TMap<uint64_t, VkShaderModule> ShaderModules;
     AVulkanDevice* Device;
 };
 
-struct AVulkanGfxPipelineDesc
+struct AVulkanGraphicsPipelineDesc
 {
     uint32_t Topology;
     uint8_t SubpassIndex;
@@ -76,19 +58,19 @@ struct AVulkanGfxPipelineDesc
     const AnsiChar* Spirvs[ShaderStage::NumStages];
 };
 
-class AVulkanGfxPipelineState
+class AVulkanGraphicsPipelineState
 {
 public:
-    AVulkanGfxPipelineState(AVulkanDevice* Device, const AVulkanGfxPipelineDesc& Desc);
-    ~AVulkanGfxPipelineState();
+    AVulkanGraphicsPipelineState(AVulkanDevice* Device, const AVulkanGraphicsPipelineDesc& Desc);
+    ~AVulkanGraphicsPipelineState();
 
-    void Bind(AVulkanCmdBuffer* CmdBuffer);
+    void Bind(AVulkanCommandBuffer* CmdBuffer);
 
 private:
     void FindOrCreateShaderModules();
 
 private:
-    AVulkanGfxPipelineDesc Desc;
+    AVulkanGraphicsPipelineDesc Desc;
     VkShaderModule ShaderModules[ShaderStage::NumStages];
 
     VkPipelineLayout Layout;
@@ -106,44 +88,13 @@ public:
     AVulkanPipelineStateManager(AVulkanDevice* Device);
     ~AVulkanPipelineStateManager();
 
-    AVulkanGfxPipelineState* CreateGfxPipelineState(AVulkanRenderPass* RenderPass);
+    AVulkanGraphicsPipelineState* CreateGraphicsPipelineState(AVulkanRenderPass* RenderPass);
 
 private:
-    bool CreateGfxPipeline(AVulkanGfxPipelineState* PSO);
+    bool CreateGraphicsPipeline(AVulkanGraphicsPipelineState* PSO);
 
 private:
-    TMap<int64_t, AVulkanGfxPipelineState*> GfxPSOMap;
+    TMap<int64_t, AVulkanGraphicsPipelineState*> GraphicsPSOMap;
 
     AVulkanDevice* Device;
-};
-
-// TODO:
-class AVulkanRenderingState
-{
-public:
-    AVulkanRenderingState(AVulkanRHI* RHI, AVulkanDevice* Device);
-
-    void Reset();
-
-    void SetViewport(float MinX, float MinY, float MinZ, float MaxX, float MaxY, float MaxZ);
-    void SetScissorRect(bool bEnable, uint32_t MinX, uint32_t MinY, uint32_t MaxX, uint32_t MaxY);
-
-    bool SetGfxPipeline(AVulkanGfxPipelineState* PSO);
-
-    void Bind(AVulkanCmdBuffer* CmdBuffer) { CurrentPSO->Bind(CmdBuffer); }
-    void PrepareForDraw(AVulkanCmdBuffer* CmdBuffer);
-
-private:
-    void SetScissorRect(uint32_t MinX, uint32_t MinY, uint32_t Width, uint32_t Height);
-
-    void UpdateDynamicStates(AVulkanCmdBuffer* CmdBuffer);
-
-private:
-    VkViewport Viewport;
-    VkRect2D Scissor;
-
-    AVulkanGfxPipelineState* CurrentPSO;
-
-    AVulkanDevice* Device;
-    AVulkanRHI* RHI;
 };

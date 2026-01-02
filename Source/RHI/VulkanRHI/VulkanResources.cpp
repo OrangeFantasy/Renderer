@@ -12,66 +12,201 @@ static constexpr const VkImageTiling VulkanViewTypeTilingMode[VK_IMAGE_VIEW_TYPE
     VK_IMAGE_TILING_OPTIMAL, // VK_IMAGE_VIEW_TYPE_2D_ARRAY
     VK_IMAGE_TILING_OPTIMAL, // VK_IMAGE_VIEW_TYPE_CUBE_ARRAY
 };
+//
+//void AVulkanTextureView::Create(AVulkanDevice* Device, VkImage InImage, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, VkFormat Format,
+//    uint32_t FirstMip, uint32_t NumMips, uint32_t ArraySliceIndex, uint32_t NumArraySlices)
+//{
+//    Image = InImage;
+//
+//    VkImageViewCreateInfo ViewInfo;
+//    ZeroVulkanStruct(ViewInfo, VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
+//    ViewInfo.image = InImage;
+//    ViewInfo.viewType = ViewType;
+//    ViewInfo.format = Format;
+//
+//    ViewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+//    ViewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+//    ViewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+//    ViewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+//
+//    ViewInfo.subresourceRange.aspectMask = AspectFlags;
+//    ViewInfo.subresourceRange.baseMipLevel = FirstMip;
+//    ViewInfo.subresourceRange.levelCount = NumMips;
+//    ViewInfo.subresourceRange.baseArrayLayer = ArraySliceIndex;
+//
+//    switch (ViewType)
+//    {
+//    case VK_IMAGE_VIEW_TYPE_3D:
+//        ViewInfo.subresourceRange.layerCount = 1;
+//        break;
+//    case VK_IMAGE_VIEW_TYPE_CUBE:
+//        check(NumArraySlices == 1, "View type is VK_IMAGE_VIEW_TYPE_CUBE, but NumArraySlices != 1");
+//        ViewInfo.subresourceRange.layerCount = 6;
+//        break;
+//    case VK_IMAGE_VIEW_TYPE_CUBE_ARRAY:
+//        ViewInfo.subresourceRange.layerCount = 6 * NumArraySlices;
+//        break;
+//    case VK_IMAGE_VIEW_TYPE_1D_ARRAY:
+//    case VK_IMAGE_VIEW_TYPE_2D_ARRAY:
+//        ViewInfo.subresourceRange.layerCount = NumArraySlices;
+//        break;
+//    default:
+//        ViewInfo.subresourceRange.layerCount = 1;
+//        break;
+//    }
+//
+//    VK_CHECK_RESULT(VulkanApi::vkCreateImageView(Device->GetHandle(), &ViewInfo, VK_CPU_ALLOCATOR, &View));
+//}
+//
+//void AVulkanTextureView::Destory(AVulkanDevice* Device)
+//{
+//    if (View)
+//    {
+//        VulkanApi::vkDestroyImageView(Device->GetHandle(), View, VK_CPU_ALLOCATOR);
+//        View = VK_NULL_HANDLE;
+//        Image = VK_NULL_HANDLE;
+//    }
+//}
+//
+//AVulkanSurface::AVulkanSurface(AVulkanDevice* InDevice, VkImageViewType InViewType, VkFormat InFormat, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ,
+//    uint32_t InArraySize, uint32_t InNumMips, uint32_t InNumSamples, VkImageAspectFlags InAspectFlags)
+//    : Super(InDevice), ViewType(InViewType), PixelFormat(InFormat), Width(SizeX), Height(SizeY), Depth(SizeZ), ArraySize(InArraySize), NumMips(InNumMips),
+//      NumSamples(InNumSamples), AspectMask(InAspectFlags), Image(VK_NULL_HANDLE)//, OwningTexture(nullptr)
+//{
+//    Tiling = VulkanViewTypeTilingMode[ViewType];
+//    const VkPhysicalDeviceProperties& DeviceProperties = InDevice->GetPhysicalDeviceProperties();
+//
+//    VkImageCreateInfo ImageInfo;
+//    ZeroVulkanStruct(ImageInfo, VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO);
+//    ImageInfo.flags = (ViewType == VK_IMAGE_VIEW_TYPE_CUBE || ViewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY) ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0;
+//
+//    switch (ViewType)
+//    {
+//    case VK_IMAGE_VIEW_TYPE_2D:
+//        check(SizeX <= DeviceProperties.limits.maxImageDimension2D);
+//        check(SizeY <= DeviceProperties.limits.maxImageDimension2D);
+//        ImageInfo.imageType = VK_IMAGE_TYPE_2D;
+//        break;
+//    default:
+//        check(false);
+//        break;
+//    }
+//
+//    ImageInfo.format = PixelFormat;
+//    ImageInfo.extent.width = SizeX;
+//    ImageInfo.extent.height = SizeY;
+//    ImageInfo.extent.depth = ViewType == VK_IMAGE_VIEW_TYPE_3D ? SizeZ : 1;
+//    ImageInfo.mipLevels = NumMips;
+//
+//    uint32_t LayerCount = (ViewType == VK_IMAGE_VIEW_TYPE_CUBE || ViewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY) ? 6 : 1;
+//    ImageInfo.arrayLayers = ArraySize * LayerCount;
+//    check(ImageInfo.arrayLayers <= DeviceProperties.limits.maxImageArrayLayers);
+//
+//    switch (NumSamples)
+//    {
+//    case 1:
+//        ImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+//        break;
+//    case 2:
+//        ImageInfo.samples = VK_SAMPLE_COUNT_2_BIT;
+//        break;
+//    case 4:
+//        ImageInfo.samples = VK_SAMPLE_COUNT_4_BIT;
+//        break;
+//    case 8:
+//        ImageInfo.samples = VK_SAMPLE_COUNT_8_BIT;
+//        break;
+//    case 16:
+//        ImageInfo.samples = VK_SAMPLE_COUNT_16_BIT;
+//        break;
+//    case 32:
+//        ImageInfo.samples = VK_SAMPLE_COUNT_32_BIT;
+//        break;
+//    case 64:
+//        ImageInfo.samples = VK_SAMPLE_COUNT_64_BIT;
+//        break;
+//    default:
+//        check(0, "Unsupported number of samples.");
+//        break;
+//    }
+//
+//    ImageInfo.tiling = Tiling;
+//    ImageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+//    ImageInfo.queueFamilyIndexCount = 0;
+//    ImageInfo.pQueueFamilyIndices = nullptr;
+//    ImageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+//
+//    ImageInfo.usage = 0;
+//    ImageInfo.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+//    ImageInfo.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+//    ImageInfo.usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+//
+//    const VkFormatProperties* FormatProperties = Device->GetFormatProperties();
+//    const VkFormatFeatureFlags FormatFlags = FormatProperties[PixelFormat].optimalTilingFeatures;
+//
+//    if ((FormatFlags & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) == 0)
+//    {
+//        check((ImageInfo.usage & VK_IMAGE_USAGE_SAMPLED_BIT) == 0);
+//        ImageInfo.usage &= ~VK_IMAGE_USAGE_SAMPLED_BIT;
+//    }
+//
+//    if ((FormatFlags & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) == 0)
+//    {
+//        check((ImageInfo.usage & VK_IMAGE_USAGE_STORAGE_BIT) == 0);
+//        ImageInfo.usage &= ~VK_IMAGE_USAGE_STORAGE_BIT;
+//    }
+//
+//    if ((FormatFlags & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT) == 0)
+//    {
+//        check((ImageInfo.usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) == 0);
+//        ImageInfo.usage &= ~VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+//    }
+//
+//    if ((FormatFlags & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == 0)
+//    {
+//        check((ImageInfo.usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) == 0);
+//        ImageInfo.usage &= ~VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+//    }
+//
+//    if ((FormatFlags & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT) == 0)
+//    {
+//        ImageInfo.usage &= ~VK_IMAGE_USAGE_TRANSFER_SRC_BIT; // this flag is used unconditionally, strip it without warnings
+//    }
+//
+//    if ((FormatFlags & VK_FORMAT_FEATURE_TRANSFER_DST_BIT) == 0)
+//    {
+//        ImageInfo.usage &= ~VK_IMAGE_USAGE_TRANSFER_DST_BIT; // this flag is used unconditionally, strip it without warnings
+//    }
+//
+//    // if ((UEFlags & TexCreate_DepthStencilTargetable) && GVulkanDepthStencilForceStorageBit)
+//    // {
+//    //     ImageCreateInfo.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
+//    // }
+//
+//    VK_CHECK_RESULT(VulkanApi::vkCreateImage(Device->GetHandle(), &ImageInfo, VK_CPU_ALLOCATOR, &Image));
+//}
+//
+//AVulkanSurface::AVulkanSurface(AVulkanDevice* InDevice, VkImageViewType InViewType, VkFormat InFormat, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ,
+//    uint32_t InArraySize, uint32_t InNumMips, uint32_t InNumSamples, VkImageAspectFlags InAspectFlags, VkImage InImage)
+//    : Super(InDevice), ViewType(InViewType), PixelFormat(InFormat), Width(SizeX), Height(SizeY), Depth(SizeZ), ArraySize(InArraySize), NumMips(InNumMips),
+//      NumSamples(InNumSamples), AspectMask(InAspectFlags), Image(InImage)//, OwningTexture(nullptr)
+//{
+//    Tiling = VulkanViewTypeTilingMode[ViewType];
+//}
+//
+//AVulkanSurface::~AVulkanSurface()
+//{
+//    if (Image != VK_NULL_HANDLE)
+//    {
+//        VulkanApi::vkDestroyImage(Device->GetHandle(), Image, VK_CPU_ALLOCATOR);
+//    }
+//}
 
-void AVulkanTextureView::Create(AVulkanDevice* Device, VkImage InImage, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, VkFormat Format,
-    uint32_t FirstMip, uint32_t NumMips, uint32_t ArraySliceIndex, uint32_t NumArraySlices)
-{
-    Image = InImage;
-
-    VkImageViewCreateInfo ViewInfo;
-    ZeroVulkanStruct(ViewInfo, VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
-    ViewInfo.image = InImage;
-    ViewInfo.viewType = ViewType;
-    ViewInfo.format = Format;
-
-    ViewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    ViewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    ViewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    ViewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-    ViewInfo.subresourceRange.aspectMask = AspectFlags;
-    ViewInfo.subresourceRange.baseMipLevel = FirstMip;
-    ViewInfo.subresourceRange.levelCount = NumMips;
-    ViewInfo.subresourceRange.baseArrayLayer = ArraySliceIndex;
-
-    switch (ViewType)
-    {
-    case VK_IMAGE_VIEW_TYPE_3D:
-        ViewInfo.subresourceRange.layerCount = 1;
-        break;
-    case VK_IMAGE_VIEW_TYPE_CUBE:
-        check(NumArraySlices == 1, "View type is VK_IMAGE_VIEW_TYPE_CUBE, but NumArraySlices != 1");
-        ViewInfo.subresourceRange.layerCount = 6;
-        break;
-    case VK_IMAGE_VIEW_TYPE_CUBE_ARRAY:
-        ViewInfo.subresourceRange.layerCount = 6 * NumArraySlices;
-        break;
-    case VK_IMAGE_VIEW_TYPE_1D_ARRAY:
-    case VK_IMAGE_VIEW_TYPE_2D_ARRAY:
-        ViewInfo.subresourceRange.layerCount = NumArraySlices;
-        break;
-    default:
-        ViewInfo.subresourceRange.layerCount = 1;
-        break;
-    }
-
-    VK_CHECK_RESULT(VulkanApi::vkCreateImageView(Device->GetHandle(), &ViewInfo, VK_CPU_ALLOCATOR, &View));
-}
-
-void AVulkanTextureView::Destory(AVulkanDevice* Device)
-{
-    if (View)
-    {
-        VulkanApi::vkDestroyImageView(Device->GetHandle(), View, VK_CPU_ALLOCATOR);
-        View = VK_NULL_HANDLE;
-        Image = VK_NULL_HANDLE;
-    }
-}
-
-AVulkanSurface::AVulkanSurface(AVulkanDevice* InDevice, VkImageViewType InViewType, VkFormat InFormat, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ,
+AVulkanTexture::AVulkanTexture(AVulkanDevice* InDevice, VkImageViewType InViewType, VkFormat InFormat, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ,
     uint32_t InArraySize, uint32_t InNumMips, uint32_t InNumSamples, VkImageAspectFlags InAspectFlags)
-    : Super(InDevice), ViewType(InViewType), PixelFormat(InFormat), Width(SizeX), Height(SizeY), Depth(SizeZ), ArraySize(InArraySize), NumMips(InNumMips),
-      NumSamples(InNumSamples), AspectMask(InAspectFlags), Image(VK_NULL_HANDLE), OwningTexture(nullptr)
+    : Device(InDevice), ViewType(InViewType), PixelFormat(InFormat), Width(SizeX), Height(SizeY), Depth(SizeZ), ArraySize(InArraySize), NumMips(InNumMips),
+      NumSamples(InNumSamples), AspectMask(InAspectFlags), Image(VK_NULL_HANDLE), View(VK_NULL_HANDLE)
+    //, Surface(Device, ViewType, Format, SizeX, SizeY, SizeZ, ArraySize, NumMips, NumSamples, AspectFlags)
 {
     Tiling = VulkanViewTypeTilingMode[ViewType];
     const VkPhysicalDeviceProperties& DeviceProperties = InDevice->GetPhysicalDeviceProperties();
@@ -183,68 +318,105 @@ AVulkanSurface::AVulkanSurface(AVulkanDevice* InDevice, VkImageViewType InViewTy
     //     ImageCreateInfo.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
     // }
 
-    VK_CHECK_RESULT(VulkanApi::vkCreateImage(Device->GetHandle(), &ImageInfo, VK_CPU_ALLOCATOR, &Image));
+    VK_CHECK_RESULT(VulkanApi::vkCreateImage(Device->GetHandle(), &ImageInfo, VK_CPU_ALLOCATOR, &Image))
+    //Surface.OwningTexture = this;
+    //check(Surface.PixelFormat != VK_FORMAT_UNDEFINED, "Undefined pixel format.");
+    check(PixelFormat != VK_FORMAT_UNDEFINED, "Undefined pixel format.");
+
+    CreateTextureView();
+    //bool bIsArray = ViewType == VK_IMAGE_VIEW_TYPE_1D_ARRAY || ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY || ViewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+    //TextureView.Create(Device, Surface.Image, ViewType, Surface.AspectMask, Surface.PixelFormat, 0, std::max(NumMips, 1u), 0,
+    //    bIsArray ? std::max(1u, ArraySize) : std::max(1u, SizeZ));
 }
 
-AVulkanSurface::AVulkanSurface(AVulkanDevice* InDevice, VkImageViewType InViewType, VkFormat InFormat, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ,
+AVulkanTexture::AVulkanTexture(AVulkanDevice* InDevice, VkImageViewType InViewType, VkFormat InFormat, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ,
     uint32_t InArraySize, uint32_t InNumMips, uint32_t InNumSamples, VkImageAspectFlags InAspectFlags, VkImage InImage)
-    : Super(InDevice), ViewType(InViewType), PixelFormat(InFormat), Width(SizeX), Height(SizeY), Depth(SizeZ), ArraySize(InArraySize), NumMips(InNumMips),
-      NumSamples(InNumSamples), AspectMask(InAspectFlags), Image(InImage), OwningTexture(nullptr)
+    : Device(InDevice), ViewType(InViewType), PixelFormat(InFormat), Width(SizeX), Height(SizeY), Depth(SizeZ), ArraySize(InArraySize), NumMips(InNumMips),
+      NumSamples(InNumSamples), AspectMask(InAspectFlags), Image(InImage), View(VK_NULL_HANDLE)
 {
     Tiling = VulkanViewTypeTilingMode[ViewType];
+
+    //Surface.OwningTexture = this;
+    check(PixelFormat != VK_FORMAT_UNDEFINED, "Undefined pixel format.");
+
+    CreateTextureView();
+    //if (ViewType != VK_IMAGE_VIEW_TYPE_MAX_ENUM && Surface.Image != VK_NULL_HANDLE)
+    //{
+    //    bool bIsArray = ViewType == VK_IMAGE_VIEW_TYPE_1D_ARRAY || ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY || ViewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+    //    TextureView.Create(Device, Image, ViewType, Surface.AspectMask, Surface.PixelFormat, 0, std::max(NumMips, 1u), 0,
+    //        bIsArray ? std::max(1u, ArraySize) : std::max(1u, SizeZ));
+    //}
 }
 
-AVulkanSurface::~AVulkanSurface()
+void AVulkanTexture::CreateTextureView()
 {
+    VkImageViewCreateInfo ViewInfo;
+    ZeroVulkanStruct(ViewInfo, VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
+    ViewInfo.image = Image;
+    ViewInfo.viewType = ViewType;
+    ViewInfo.format = PixelFormat;
+
+    ViewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    ViewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    ViewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    ViewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+    ViewInfo.subresourceRange.aspectMask = AspectMask;
+    ViewInfo.subresourceRange.baseMipLevel = 0;
+    ViewInfo.subresourceRange.levelCount = NumMips;
+    ViewInfo.subresourceRange.baseArrayLayer = 0;
+
+    bool bIsArray = ViewType == VK_IMAGE_VIEW_TYPE_1D_ARRAY || ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY || ViewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+    uint32_t NumArraySlices = bIsArray ? std::max(1u, ArraySize) : std::max(1u, Depth);
+    switch (ViewType)
+    {
+    case VK_IMAGE_VIEW_TYPE_3D:
+        ViewInfo.subresourceRange.layerCount = 1;
+        break;
+    case VK_IMAGE_VIEW_TYPE_CUBE:
+        check(NumArraySlices == 1, "View type is VK_IMAGE_VIEW_TYPE_CUBE, but NumArraySlices != 1");
+        ViewInfo.subresourceRange.layerCount = 6;
+        break;
+    case VK_IMAGE_VIEW_TYPE_CUBE_ARRAY:
+        ViewInfo.subresourceRange.layerCount = 6 * NumArraySlices;
+        break;
+    case VK_IMAGE_VIEW_TYPE_1D_ARRAY:
+    case VK_IMAGE_VIEW_TYPE_2D_ARRAY:
+        ViewInfo.subresourceRange.layerCount = NumArraySlices;
+        break;
+    default:
+        ViewInfo.subresourceRange.layerCount = 1;
+        break;
+    }
+
+    VK_CHECK_RESULT(VulkanApi::vkCreateImageView(Device->GetHandle(), &ViewInfo, VK_CPU_ALLOCATOR, &View));
+}
+
+AVulkanTexture::~AVulkanTexture()
+{
+    if (View != VK_NULL_HANDLE)
+    {
+        VulkanApi::vkDestroyImageView(Device->GetHandle(), View, VK_CPU_ALLOCATOR);
+        View = VK_NULL_HANDLE;
+        Image = VK_NULL_HANDLE;
+    }
     if (Image != VK_NULL_HANDLE)
     {
         VulkanApi::vkDestroyImage(Device->GetHandle(), Image, VK_CPU_ALLOCATOR);
     }
 }
 
-AVulkanTexture::AVulkanTexture(AVulkanDevice* InDevice, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ,
-    uint32_t ArraySize, uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags)
-    : Super(InDevice), Surface(Device, ViewType, Format, SizeX, SizeY, SizeZ, ArraySize, NumMips, NumSamples, AspectFlags)
-{
-    Surface.OwningTexture = this;
-    check(Surface.PixelFormat != VK_FORMAT_UNDEFINED, "Undefined pixel format.");
-
-    bool bIsArray = ViewType == VK_IMAGE_VIEW_TYPE_1D_ARRAY || ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY || ViewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
-    TextureView.Create(Device, Surface.Image, ViewType, Surface.AspectMask, Surface.PixelFormat, 0, std::max(NumMips, 1u), 0,
-        bIsArray ? std::max(1u, ArraySize) : std::max(1u, SizeZ));
-}
-
-AVulkanTexture::AVulkanTexture(AVulkanDevice* InDevice, VkImageViewType ViewType, VkFormat Format, uint32_t SizeX, uint32_t SizeY, uint32_t SizeZ,
-    uint32_t ArraySize, uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags, VkImage Image)
-    : Super(InDevice), Surface(Device, ViewType, Format, SizeX, SizeY, SizeZ, ArraySize, NumMips, NumSamples, AspectFlags, Image)
-{
-    Surface.OwningTexture = this;
-    check(Surface.PixelFormat != VK_FORMAT_UNDEFINED, "Undefined pixel format.");
-
-    if (ViewType != VK_IMAGE_VIEW_TYPE_MAX_ENUM && Surface.Image != VK_NULL_HANDLE)
-    {
-        bool bIsArray = ViewType == VK_IMAGE_VIEW_TYPE_1D_ARRAY || ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY || ViewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
-        TextureView.Create(Device, Image, ViewType, Surface.AspectMask, Surface.PixelFormat, 0, std::max(NumMips, 1u), 0,
-            bIsArray ? std::max(1u, ArraySize) : std::max(1u, SizeZ));
-    }
-}
-
-AVulkanTexture::~AVulkanTexture()
-{
-    TextureView.Destory(Device);
-}
-
-AVulkanTexture2D::AVulkanTexture2D(
-    AVulkanDevice* Device, VkFormat Format, uint32_t InSizeX, uint32_t InSizeY, uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags)
-    : AVulkanTexture(Device, VK_IMAGE_VIEW_TYPE_2D, Format, InSizeX, InSizeY, 1, 1, NumMips, NumSamples, AspectFlags), SizeX(InSizeX), SizeY(InSizeY)
-{
-}
-
-AVulkanTexture2D::AVulkanTexture2D(AVulkanDevice* Device, VkFormat Format, uint32_t InSizeX, uint32_t InSizeY, uint32_t NumMips, uint32_t NumSamples,
-    VkImageAspectFlags AspectFlags, VkImage Image)
-    : AVulkanTexture(Device, VK_IMAGE_VIEW_TYPE_2D, Format, InSizeX, InSizeY, 1, 1, NumMips, NumSamples, AspectFlags, Image), SizeX(InSizeX), SizeY(InSizeY)
-{
-}
+//AVulkanTexture2D::AVulkanTexture2D(
+//    AVulkanDevice* Device, VkFormat Format, uint32_t InSizeX, uint32_t InSizeY, uint32_t NumMips, uint32_t NumSamples, VkImageAspectFlags AspectFlags)
+//    : AVulkanTexture(Device, VK_IMAGE_VIEW_TYPE_2D, Format, InSizeX, InSizeY, 1, 1, NumMips, NumSamples, AspectFlags), SizeX(InSizeX), SizeY(InSizeY)
+//{
+//}
+//
+//AVulkanTexture2D::AVulkanTexture2D(AVulkanDevice* Device, VkFormat Format, uint32_t InSizeX, uint32_t InSizeY, uint32_t NumMips, uint32_t NumSamples,
+//    VkImageAspectFlags AspectFlags, VkImage Image)
+//    : AVulkanTexture(Device, VK_IMAGE_VIEW_TYPE_2D, Format, InSizeX, InSizeY, 1, 1, NumMips, NumSamples, AspectFlags, Image), SizeX(InSizeX), SizeY(InSizeY)
+//{
+//}
 
 AVulkanRenderTargetLayout::AVulkanRenderTargetLayout(const AVulkanRenderTargetsInfo& RTInfo)
     : NumAttachmentDescriptions(0), NumColorAttachments(0) /*, NumInputAttachments(0)*/, bHasDepthStencil(false) /*, bHasResolveAttachments(false) */,
@@ -268,7 +440,8 @@ AVulkanRenderTargetLayout::AVulkanRenderTargetLayout(const AVulkanRenderTargetsI
         const AVulkanRenderTargetView& RTView = RTInfo.ColorRenderTarget[Index];
         if (AVulkanTexture* Texture = RTView.Texture)
         {
-            const AVulkanSurface& Surface = Texture->Surface;
+            //const AVulkanSurface& Surface = Texture->Surface;
+            const AVulkanTexture& Surface = *Texture;
 
             check(!NumSamples || NumSamples == Surface.NumSamples);
             NumSamples = Surface.NumSamples;
@@ -315,7 +488,9 @@ AVulkanRenderTargetLayout::AVulkanRenderTargetLayout(const AVulkanRenderTargetsI
         AVulkanTexture* Texture = RTView.Texture;
         check(Texture);
 
-        const AVulkanSurface& Surface = Texture->Surface;
+        const AVulkanTexture& Surface = *Texture;
+
+        //const AVulkanSurface& Surface = Texture->Surface;
         check(!NumSamples || NumSamples == Surface.NumSamples);
         NumSamples = Surface.NumSamples;
 
@@ -358,9 +533,9 @@ AVulkanRenderTargetLayout::AVulkanRenderTargetLayout(const AVulkanRenderTargetsI
 
     NumUsedClearValues = bFoundClearOp ? NumAttachmentDescriptions : 0;
 
-    char HashInfoByte[sizeof(AHashInfo)];
-    std::memcpy(HashInfoByte, &HashInfo, sizeof(AHashInfo));
-    Hash = static_cast<uint64_t>(std::hash<char*>()(HashInfoByte));
+    uint8_t HashInfoByte[sizeof(AHashInfo)];
+    AMemory::Memcpy(HashInfoByte, &HashInfo, sizeof(AHashInfo));
+    Hash = static_cast<uint64_t>(std::hash<uint8_t*>()(HashInfoByte));
 }
 
 // CVulkanRenderTargetLayout::CVulkanRenderTargetLayout(const CVulkanRenderPassInfo& RPInfo)
@@ -623,26 +798,29 @@ AVulkanFramebuffer::AVulkanFramebuffer(
     uint32_t NumLayers = 1; // For 2D.
     uint32_t MipIndex = 0;
 
+    TArray<VkImageView> AttachmentViews;
+
     for (int32_t Index = 0; Index < RTInfo.NumColorRenderTargets; ++Index)
     {
         AVulkanTexture* Texture = RTInfo.ColorRenderTarget[Index].Texture;
         if (Texture)
         {
-            const AVulkanSurface& Surface = Texture->Surface;
+            //const AVulkanSurface& Surface = Texture->Surface;
+            const AVulkanTexture& Surface = *Texture;
             check(Surface.Image != VK_NULL_HANDLE);
 
             ColorRenderTargetImages[Index] = Surface.Image;
-            MipIndex = RTInfo.ColorRenderTarget[Index].MipIndex;
+            //MipIndex = RTInfo.ColorRenderTarget[Index].MipIndex;
 
-            AVulkanTextureView RTView;
-            if (Surface.ViewType == VK_IMAGE_VIEW_TYPE_2D || Surface.ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY)
-            {
-                RTView.Create(Device, Surface.Image, Surface.ViewType, Surface.AspectMask, Surface.PixelFormat, MipIndex, 1,
-                    std::max(0, (int32_t)RTInfo.ColorRenderTarget[Index].ArraySliceIndex), Surface.NumOfArrayLevels());
-            }
-            check(RTView.View != VK_NULL_HANDLE, "Not Implement.");
+            //AVulkanTextureView RTView;
+            //if (Surface.ViewType == VK_IMAGE_VIEW_TYPE_2D || Surface.ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY)
+            //{
+            //    RTView.Create(Device, Surface.Image, Surface.ViewType, Surface.AspectMask, Surface.PixelFormat, MipIndex, 1,
+            //        std::max(0, (int32_t)RTInfo.ColorRenderTarget[Index].ArraySliceIndex), Surface.NumOfArrayLevels());
+            //}
+            //check(RTView.View != VK_NULL_HANDLE, "Not Implement.");
 
-            AttachmentTextureViews.Add(RTView);
+            AttachmentViews.Add(Surface.View);
             ++NumColorAttachments;
 
             // TODO: Resolve.
@@ -654,27 +832,27 @@ AVulkanFramebuffer::AVulkanFramebuffer(
         const AVulkanTexture* Texture = RTInfo.DepthStencilRenderTarget.Texture;
         check(Texture);
 
-        const AVulkanSurface& Surface = Texture->Surface;
+        //const AVulkanSurface& Surface = Texture->Surface;
+        const AVulkanTexture& Surface = *Texture;
         check(Surface.Image != VK_NULL_HANDLE);
 
         DepthStencilRenderTargetImage = Surface.Image;
 
-        AVulkanTextureView RTView;
-        if (Surface.ViewType == VK_IMAGE_VIEW_TYPE_2D || Surface.ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY)
-        {
-            // depth attachments need a separate view to have no swizzle components, for validation correctness
-            RTView.Create(Device, Surface.Image, Surface.ViewType, Surface.AspectMask, Surface.PixelFormat, MipIndex, 1, 0, Surface.NumOfArrayLevels());
-        }
-        check(RTView.View != VK_NULL_HANDLE, "Not Implement.");
+        //AVulkanTextureView RTView;
+        //if (Surface.ViewType == VK_IMAGE_VIEW_TYPE_2D || Surface.ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY)
+        //{
+        //    // depth attachments need a separate view to have no swizzle components, for validation correctness
+        //    RTView.Create(Device, Surface.Image, Surface.ViewType, Surface.AspectMask, Surface.PixelFormat, MipIndex, 1, 0, Surface.NumOfArrayLevels());
+        //}
+        //check(RTView.View != VK_NULL_HANDLE, "Not Implement.");
 
-        AttachmentTextureViews.Add(RTView);
+        AttachmentViews.Add(Surface.View);
     }
 
-    TArray<VkImageView> AttachmentViews;
-    for (AVulkanTextureView& TextureView : AttachmentTextureViews)
-    {
-        AttachmentViews.Add(TextureView.View);
-    }
+    //for (AVulkanTextureView& TextureView : AttachmentTextureViews)
+    //{
+    //    AttachmentViews.Add(TextureView.View);
+    //}
 
     VkFramebufferCreateInfo CreateInfo;
     ZeroVulkanStruct(CreateInfo, VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO);
@@ -689,10 +867,10 @@ AVulkanFramebuffer::AVulkanFramebuffer(
 
 AVulkanFramebuffer::~AVulkanFramebuffer()
 {
-    for (AVulkanTextureView& TextureView : AttachmentTextureViews)
-    {
-        TextureView.Destory(Device);
-    }
+    //for (AVulkanTextureView& TextureView : AttachmentTextureViews)
+    //{
+    //    TextureView.Destory(Device);
+    //}
 
     VulkanApi::vkDestroyFramebuffer(Device->GetHandle(), Framebuffer, VK_CPU_ALLOCATOR);
     Framebuffer = VK_NULL_HANDLE;
@@ -710,7 +888,7 @@ bool AVulkanFramebuffer::Matches(const AVulkanRenderTargetsInfo& RTInfo) const
         if (B.Texture)
         {
             VkImage AImage = DepthStencilRenderTargetImage;
-            VkImage BImage = B.Texture->Surface.Image;
+            VkImage BImage = B.Texture->Image;
             if (AImage != BImage)
             {
                 return false;
@@ -725,7 +903,7 @@ bool AVulkanFramebuffer::Matches(const AVulkanRenderTargetsInfo& RTInfo) const
         if (B.Texture)
         {
             VkImage AImage = ColorRenderTargetImages[AttachementIndex];
-            VkImage BImage = B.Texture->Surface.Image;
+            VkImage BImage = B.Texture->Image;
             if (AImage != BImage)
             {
                 return false;
@@ -737,7 +915,7 @@ bool AVulkanFramebuffer::Matches(const AVulkanRenderTargetsInfo& RTInfo) const
     return true;
 }
 
-AVulkanLayoutManager::~AVulkanLayoutManager()
+AVulkanRenderPassManager::~AVulkanRenderPassManager()
 {
     for (auto& [Hash, RenderPass] : RenderPasses)
     {
@@ -760,7 +938,7 @@ AVulkanLayoutManager::~AVulkanLayoutManager()
     }
 }
 
-AVulkanRenderPass* AVulkanLayoutManager::GetOrCreateRenderPass(AVulkanDevice* Device, const AVulkanRenderTargetLayout& RTLayout)
+AVulkanRenderPass* AVulkanRenderPassManager::GetOrCreateRenderPass(const AVulkanRenderTargetLayout& RTLayout)
 {
     uint64_t RTInfoHash = RTLayout.GetHash();
 
@@ -775,8 +953,8 @@ AVulkanRenderPass* AVulkanLayoutManager::GetOrCreateRenderPass(AVulkanDevice* De
     return RenderPass;
 }
 
-AVulkanFramebuffer* AVulkanLayoutManager::GetOrCreateFramebuffer(
-    AVulkanDevice* Device, const AVulkanRenderTargetsInfo& RTInfo, const AVulkanRenderTargetLayout& RTLayout, AVulkanRenderPass* RenderPass)
+AVulkanFramebuffer* AVulkanRenderPassManager::GetOrCreateFramebuffer(
+    const AVulkanRenderTargetsInfo& RTInfo, const AVulkanRenderTargetLayout& RTLayout, AVulkanRenderPass* RenderPass)
 {
     uint64_t RTInfoHash = RTLayout.GetHash();
 
@@ -804,7 +982,7 @@ AVulkanFramebuffer* AVulkanLayoutManager::GetOrCreateFramebuffer(
     return Framebuffer;
 }
 
-// void AVulkanLayoutManager::EndRenderPass(CVulkanCmdBuffer* CmdBuffer)
+// void AVulkanRenderPassManager::EndRenderPass(CVulkanCmdBuffer* CmdBuffer)
 //  {
 //     check(CurrentRenderPass);
 //     CmdBuffer->EndRenderPass();

@@ -2,7 +2,7 @@
 
 #include "VulkanApi.h"
 
-class AVulkanDebug
+class AVulkanValidation
 {
 public:
     static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity, VkDebugUtilsMessageTypeFlagsEXT MessageType,

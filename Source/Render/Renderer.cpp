@@ -11,12 +11,15 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 
+#include <chrono>
+#include <thread>
+
 ARenderer::ARenderer(int32_t InWidth, int32_t InHeight) : WindowWidth(InWidth), WindowHeight(InHeight), RHI(nullptr)
 {
     InitializeWindow();
 
     RHI = new AVulkanRHI();
-    RHI->InitizlizeViewport(GetNativeWindowHandle(), WindowWidth, WindowHeight, false);
+    RHI->CreateViewport(GetNativeWindowHandle(), WindowWidth, WindowHeight, false);
     // AViewportInfo ViewportInfo;
     // AMemory::Memzero(ViewportInfo);
     // ViewportInfo.WindowHandle = GetNativeWindowHandle();
@@ -61,29 +64,32 @@ void* ARenderer::GetNativeWindowHandle() const
 
 void ARenderer::MainTick()
 {
-    // AVulkanTexture* BackBuffer = RHI->GetViewportBackBuffer();
+    // AVulkanTexture* BackBuffer = RHI->AcquireViewportNextBackBuffer();
 
     AVulkanRenderTargetsInfo RTInfo;
     RTInfo.NumColorRenderTargets = 1;
 
     AVulkanRenderTargetView& ColorRTView = RTInfo.ColorRenderTarget[0];
-    ColorRTView.Texture = RHI->GetViewportBackBuffer();
+    ColorRTView.Texture = RHI->GetViewportBackBuffer(0);
     ColorRTView.LoadAction = VK_ATTACHMENT_LOAD_OP_CLEAR;
     ColorRTView.StoreAction = VK_ATTACHMENT_STORE_OP_STORE;
 
     AVulkanRenderTargetLayout RTLayout(RTInfo);
 
-    AVulkanGfxPipelineState* PSO = RHI->CreateGfxPipelineState(RTLayout);
+    AVulkanGraphicsPipelineState* PSO = RHI->CreateGraphicsPipelineState(RTLayout);
 
     while (!ShouldCloseWindow())
     {
+        using Clock = std::chrono::steady_clock;
+        auto FrameStart = Clock::now();
+
         glfwPollEvents();
 
         RHI->BeginDrawing();
 
+        RHI->BeginRenderPass();
         RHI->SetViewport(0.0f, 0.0f, 0.0f, (float)WindowWidth, (float)WindowHeight, 1.0f);
 
-        RHI->BeginRenderPass();
         // RHI->SetViewport
         RHI->SetGraphicsPipelineState(PSO);
         RHI->DrawPrimitive(0, 1);
@@ -95,6 +101,14 @@ void ARenderer::MainTick()
         // RHI->EndRenderPass();
 
         RHI->EndDrawing();
+
+        auto FrameEnd = Clock::now();
+        auto FrameTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(FrameEnd - FrameStart).count();
+        constexpr int64_t TargetFrameMs = 15;
+        if (FrameTimeMs < TargetFrameMs)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(TargetFrameMs - FrameTimeMs));
+        }
     }
 
     RHI->WaitIdle();

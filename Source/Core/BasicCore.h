@@ -14,14 +14,14 @@
 #endif // !TEXT
 
 #include <cassert>
-#define _check_2(expression, msg) \
+#define _check_2(expression, msg)                                                                                                                              \
     {                                                                                                                                                          \
         if (!(expression))                                                                                                                                     \
         {                                                                                                                                                      \
-            std::cerr << "msg:" << msg << "\n"                                                                                                             \
+            std::cerr << "msg:" << msg << "\n"                                                                                                                 \
                       << "file: " << __FILE__ << "\n"                                                                                                          \
                       << "line: " << __LINE__ << "\n";                                                                                                         \
-            throw std::runtime_error(msg);                                                                                                                 \
+            throw std::runtime_error(msg);                                                                                                                     \
         }                                                                                                                                                      \
     }
 

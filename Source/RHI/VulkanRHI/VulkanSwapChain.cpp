@@ -1,14 +1,14 @@
 #include "VulkanSwapChain.h"
 
-#include "VulkanRHI.h"
 #include "VulkanDevice.h"
-#include "VulkanQueue.h"
-#include "VulkanPlatform.h"
 #include "VulkanMemory.h"
+#include "VulkanPlatform.h"
+#include "VulkanQueue.h"
+#include "VulkanRHI.h"
 
 AVulkanSwapChain::AVulkanSwapChain(AVulkanRHI* InRHI, AVulkanDevice* InDevice, void* WindowHandle, bool bIsFullScreen, uint32_t& InOutWidth,
     uint32_t& InOutHeight, uint32_t& InOutNumBackBuffers, TArray<VkImage>& OutImages, AVulkanSwapChainRecreateInfo* RecreateInfo)
-    : RHI(InRHI), Device(InDevice), SwapChain(VK_NULL_HANDLE), Surface(VK_NULL_HANDLE), SemaphoreIndex(0), CurrentImageIndex(-1)
+    : RHI(InRHI), Device(InDevice), SwapChain(VK_NULL_HANDLE), Surface(VK_NULL_HANDLE), SemaphoreIndex(-1), CurrentImageIndex(-1)
 {
     if (RecreateInfo != nullptr && RecreateInfo->SwapChain != VK_NULL_HANDLE)
     {
@@ -39,13 +39,21 @@ AVulkanSwapChain::AVulkanSwapChain(AVulkanRHI* InRHI, AVulkanDevice* InDevice, v
             break;
         }
     }
+    ImageFormat = SelectedFormat.format;
 
     // Create present queue in device.
     Device->SetupPresentQueue(Surface);
+    AVulkanQueue* PresentQueue = Device->GetPresentQueue();
+
+    VkBool32 bSupportsPresent;
+    VK_CHECK_RESULT(
+        VulkanApi::vkGetPhysicalDeviceSurfaceSupportKHR(Device->GetPhysicalDeviceHandle(), PresentQueue->GetFamilyIndex(), Surface, &bSupportsPresent));
+    check(bSupportsPresent, "Physical device doesn't support present.");
 
     // Select present mode.
     uint32_t NumFoundPresentModes = 0;
-    VK_CHECK_RESULT(VulkanApi::vkGetPhysicalDeviceSurfacePresentModesKHR(Device->GetPhysicalDeviceHandle(), Surface, &NumFoundPresentModes, nullptr));
+    VK_CHECK_RESULT(
+        VulkanApi::vkGetPhysicalDeviceSurfacePresentModesKHR(Device->GetPhysicalDeviceHandle(), Surface, &NumFoundPresentModes, nullptr));
     check(NumFoundPresentModes > 0);
 
     TArray<VkPresentModeKHR> PresentModes;
@@ -100,11 +108,6 @@ AVulkanSwapChain::AVulkanSwapChain(AVulkanRHI* InRHI, AVulkanDevice* InDevice, v
     SwapChainInfo.compositeAlpha = CompositeAlpha;
     SwapChainInfo.preTransform = SurfProperties.currentTransform;
 
-    VkBool32 bSupportsPresent;
-    VK_CHECK_RESULT(VulkanApi::vkGetPhysicalDeviceSurfaceSupportKHR(
-        Device->GetPhysicalDeviceHandle(), Device->GetPresentQueue()->GetFamilyIndex(), Surface, &bSupportsPresent));
-    check(bSupportsPresent, "Physical device doesn't support present.");
-
 #if VK_SUPPORTS_FULLSCREEN_EXCLUSIVE
     VkSurfaceFullScreenExclusiveInfoEXT FullScreenInfo;
     ZeroVulkanStruct(FullScreenInfo, VK_STRUCTURE_TYPE_SURFACE_FULL_SCREEN_EXCLUSIVE_INFO_EXT);
@@ -124,8 +127,6 @@ AVulkanSwapChain::AVulkanSwapChain(AVulkanRHI* InRHI, AVulkanDevice* InDevice, v
     }
 #endif
     VK_CHECK_RESULT(Result);
-
-    ImageFormat = SelectedFormat.format;
 
     // Destory old swapchain if it isn't a nullptr.
     if (RecreateInfo != nullptr)
@@ -149,47 +150,24 @@ AVulkanSwapChain::AVulkanSwapChain(AVulkanRHI* InRHI, AVulkanDevice* InDevice, v
     VK_CHECK_RESULT(VulkanApi::vkGetSwapchainImagesKHR(Device->GetHandle(), SwapChain, &NumSwapChainImages, OutImages.GetData()));
 
     // Create acquire Semaphore.
-    ImageAcquiredSemaphore.Resize(InOutNumBackBuffers);
+    ImageAcquiredSemaphores.Resize(InOutNumBackBuffers);
     for (uint32_t BufferIndex = 0; BufferIndex < InOutNumBackBuffers; ++BufferIndex)
     {
-        ImageAcquiredSemaphore[BufferIndex] = new AVulkanSemaphore(Device);
+        ImageAcquiredSemaphores[BufferIndex] = new AVulkanSemaphore(Device);
     }
 }
 
-int32_t AVulkanSwapChain::AcquireImageIndex(AVulkanSemaphore** OutSemaphore)
+int32_t AVulkanSwapChain::AcquireNextImageIndex(VkSemaphore* AcquiredSemaphore)
 {
-    SemaphoreIndex = (SemaphoreIndex + 1) % ImageAcquiredSemaphore.Num();
+    SemaphoreIndex = (SemaphoreIndex + 1) % ImageAcquiredSemaphores.Num();
 
-    const VkFence AcquiredFence = VK_NULL_HANDLE;
     uint32_t ImageIndex;
-    VK_CHECK_RESULT(VulkanApi::vkAcquireNextImageKHR(
-        Device->GetHandle(), SwapChain, UINT64_MAX, ImageAcquiredSemaphore[SemaphoreIndex]->GetHandle(), AcquiredFence, &ImageIndex));
+    *AcquiredSemaphore = ImageAcquiredSemaphores[SemaphoreIndex]->GetHandle();
+    VK_CHECK_RESULT(
+        VulkanApi::vkAcquireNextImageKHR(Device->GetHandle(), SwapChain, UINT64_MAX, *AcquiredSemaphore, VK_NULL_HANDLE, &ImageIndex));
 
-    *OutSemaphore = ImageAcquiredSemaphore[SemaphoreIndex];
     CurrentImageIndex = ImageIndex;
-
     return CurrentImageIndex;
-}
-
-void AVulkanSwapChain::Present(AVulkanQueue* PresentQueue, AVulkanSemaphore* BackBufferRenderingDoneSemaphore)
-{
-    VkPresentInfoKHR Info;
-    ZeroVulkanStruct(Info, VK_STRUCTURE_TYPE_PRESENT_INFO_KHR);
-
-    if (BackBufferRenderingDoneSemaphore)
-    {
-        Info.waitSemaphoreCount = 1;
-        VkSemaphore Semaphore = BackBufferRenderingDoneSemaphore->GetHandle();
-        Info.pWaitSemaphores = &Semaphore;
-    }
-
-    Info.swapchainCount = 1;
-    Info.pSwapchains = &SwapChain;
-    Info.pImageIndices = (uint32_t*)&CurrentImageIndex;
-
-    VK_CHECK_RESULT(VulkanApi::vkQueuePresentKHR(PresentQueue->GetHandle(), &Info));
-
-    CurrentImageIndex = -1;
 }
 
 void AVulkanSwapChain::Destroy(AVulkanSwapChainRecreateInfo* RecreateInfo)
@@ -207,7 +185,7 @@ void AVulkanSwapChain::Destroy(AVulkanSwapChainRecreateInfo* RecreateInfo)
     SwapChain = VK_NULL_HANDLE;
     Surface = VK_NULL_HANDLE;
 
-    for (AVulkanSemaphore* Semaphore : ImageAcquiredSemaphore)
+    for (AVulkanSemaphore* Semaphore : ImageAcquiredSemaphores)
     {
         delete Semaphore;
         Semaphore = nullptr;

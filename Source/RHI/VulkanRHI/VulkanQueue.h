@@ -2,8 +2,9 @@
 
 #include "VulkanApi.h"
 
+class AVulkanCommandBuffer;
 class AVulkanDevice;
-class AVulkanCmdBuffer;
+class AVulkanFence;
 
 class AVulkanQueue
 {
@@ -11,8 +12,9 @@ public:
     AVulkanQueue(AVulkanDevice* Device, uint32_t FamilyIndex);
     ~AVulkanQueue();
 
-    void Submit(AVulkanCmdBuffer* CmdBuffer, VkSemaphore SignalSemaphore);
-    void Submit(AVulkanCmdBuffer* CmdBuffer, uint32_t NumSignalSemaphores = 0, VkSemaphore* SignalSemaphores = nullptr);
+    void Submit(AVulkanCommandBuffer* CmdBuffer, uint32_t NumWaitSemaphores, VkSemaphore* WaitSemaphores, VkPipelineStageFlags* WaitStageFlags,
+        uint32_t NumSignalSemaphores, VkSemaphore* SignalSemaphores, AVulkanFence* Fence) const;
+    void Present(uint32_t NumWaitSemaphores, VkSemaphore* WaitSemaphores, VkSwapchainKHR* SwapChains, uint32_t ImageIndex) const;
 
     inline uint32_t GetFamilyIndex() const { return FamilyIndex; }
     inline uint32_t GetQueueIndex() const { return QueueIndex; }
